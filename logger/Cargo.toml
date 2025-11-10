@@ -1,0 +1,10 @@
+[package]
+name = "logger"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kappa_library = {path = "../kappa_library"}
+connectors_macro = { path = "../kappa_library/src/connectors_macro" }
+stream_proc_macro = {path = "../kappa_library/src/stream_proc_macro"}
+chrono = "0.4.42"

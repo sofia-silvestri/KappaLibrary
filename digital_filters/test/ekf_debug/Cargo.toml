@@ -1,0 +1,10 @@
+[package]
+name = "ekf_debug"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono.workspace = true
+filter = {path = "../../"}
+kappa_library = {path = "../../../kappa_library"}
+rand.workspace = true
