@@ -6,7 +6,8 @@ members = [
     "processor_engine/src/stream_proc_macro",
     "logger",
     "digital_filters",
-    "digital_transform"]
+    "digital_transform",
+    "utils"]
 
 [workspace.dependencies]
 num-traits = "0.2.19"
