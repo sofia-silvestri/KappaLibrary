@@ -15,7 +15,7 @@ use stream_proc_macro::StreamBlockMacro;
 use processor_engine::connectors::{ConnectorsTrait, Input, Parameter, Output};
 use processor_engine::{create_input, create_output, create_parameter};
 use processor_engine::stream_processor::{StreamBlockDyn, StreamProcessor, StreamingError};
-use processor_engine::modules::{ModuleStruct, Version};
+use data_model::modules::{ModuleStruct, Version};
 use processor_engine::stream_processor::{StreamBlock, StreamingState};
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]

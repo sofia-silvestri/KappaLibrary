@@ -7,4 +7,5 @@ edition = "2024"
 processor_engine = {path = "../processor_engine"}
 connectors_macro = { path = "../processor_engine/src/connectors_macro" }
 stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}
+data_model = {path = "../data_model"}
 chrono = "0.4.42"

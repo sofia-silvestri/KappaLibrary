@@ -5,7 +5,7 @@ use std::any::Any;
 use chrono::{DateTime, Utc};
 use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
 use processor_engine::stream_processor::{StreamingError, StreamingState, StreamProcessorStruct};
-use processor_engine::math::calculus::factorial;
+use utils::math::numbers::factorial;
 use processor_engine::{create_input, create_output, create_parameter};
 use processor_engine::connectors::{Input, Output, Parameter};
 use processor_engine::connectors::ConnectorsTrait;

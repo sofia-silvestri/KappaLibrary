@@ -1,6 +1,6 @@
 use libloading::Library;
 
-use crate::stream_processor::StreamProcessor;
+use processor_engine::stream_processor::StreamProcessor;
 use std::os::raw::c_char;
 
 #[repr(C)]

@@ -11,7 +11,7 @@ use processor_engine::connectors::{Input, Output, Parameter};
 use processor_engine::connectors::ConnectorsTrait;
 use stream_proc_macro::StreamBlockMacro;
 
-use processor_engine::math::{calculus::factorize, complex::Complex};
+use utils::math::{numbers::factorize, complex::Complex};
 
 
 #[unsafe(no_mangle)]

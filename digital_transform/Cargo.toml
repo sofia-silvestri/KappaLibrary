@@ -1,9 +1,10 @@
 [package]
-name = "transform"
+name = "digital_transform"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 processor_engine = {path = "../processor_engine"}
 stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}
+utils = {path = "../utils"}
 num-traits = "0.2.19"

@@ -1,6 +1,6 @@
 use std::os::raw::c_char;
-use processor_engine::modules::ModuleStruct;
-use processor_engine::modules::Version;
+use data_model::modules::ModuleStruct;
+use data_model::modules::Version;
 
 #[unsafe(no_mangle)]
 pub static MODULE: ModuleStruct  = ModuleStruct {

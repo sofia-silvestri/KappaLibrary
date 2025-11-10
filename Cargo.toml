@@ -7,7 +7,8 @@ members = [
     "logger",
     "digital_filters",
     "digital_transform",
-    "utils"]
+    "utils",
+    "data_model"]
 
 [workspace.dependencies]
 num-traits = "0.2.19"
