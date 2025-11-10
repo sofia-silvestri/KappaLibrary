@@ -61,10 +61,6 @@ impl DataHeader {
     }
 }
 
-pub struct StreamData<T> {
-    pub header: DataHeader,
-    pub data: Box<dyn Any + Send>,
-}
 
 pub trait StreamBlock {
     fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&Sender<T>, StreamingError>;

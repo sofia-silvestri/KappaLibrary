@@ -4,11 +4,11 @@ use std::sync::mpsc::Sender;
 use std::any::Any;
 
 use num_traits::Float;
-use kappa_library::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
-use kappa_library::stream_processor::{StreamingError, StreamingState};
-use kappa_library::{create_input, create_output, create_parameter};
-use kappa_library::connectors::{Input, Output, Parameter};
-use kappa_library::connectors::ConnectorsTrait;
+use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
+use processor_engine::stream_processor::{StreamingError, StreamingState};
+use processor_engine::{create_input, create_output, create_parameter};
+use processor_engine::connectors::{Input, Output, Parameter};
+use processor_engine::connectors::ConnectorsTrait;
 use stream_proc_macro::StreamBlockMacro;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

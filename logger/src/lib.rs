@@ -12,11 +12,11 @@ use std::process::Command;
 use std::string::ToString;
 use stream_proc_macro::StreamBlockMacro;
 
-use kappa_library::connectors::{ConnectorsTrait, Input, Parameter, Output};
-use kappa_library::{create_input, create_output, create_parameter};
-use kappa_library::stream_processor::{StreamBlockDyn, StreamProcessor, StreamingError};
-use kappa_library::modules::{ModuleStruct, Version};
-use kappa_library::stream_processor::{StreamBlock, StreamingState};
+use processor_engine::connectors::{ConnectorsTrait, Input, Parameter, Output};
+use processor_engine::{create_input, create_output, create_parameter};
+use processor_engine::stream_processor::{StreamBlockDyn, StreamProcessor, StreamingError};
+use processor_engine::modules::{ModuleStruct, Version};
+use processor_engine::stream_processor::{StreamBlock, StreamingState};
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum LogLevel {

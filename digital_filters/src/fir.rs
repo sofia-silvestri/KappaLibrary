@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
 use std::any::Any;
-use kappa_library::stream_processor::{StreamProcessor, StreamBlock, StreamBlockDyn};
-use kappa_library::stream_processor::{StreamingError, StreamingState};
-use kappa_library::{create_input, create_output, create_parameter};
-use kappa_library::connectors::{Input, Output, Parameter};
+use processor_engine::stream_processor::{StreamProcessor, StreamBlock, StreamBlockDyn};
+use processor_engine::stream_processor::{StreamingError, StreamingState};
+use processor_engine::{create_input, create_output, create_parameter};
+use processor_engine::connectors::{Input, Output, Parameter};
 use stream_proc_macro::StreamBlockMacro;
 
 #[derive(StreamBlockMacro)]
@@ -63,13 +63,13 @@ impl FirFilter
 }
 
 impl StreamProcessor for FirFilter {
-    fn process(&mut self) -> Result<(), kappa_library::stream_processor::StreamingError> {
+    fn process(&mut self) -> Result<(), processor_engine::stream_processor::StreamingError> {
         let input_vector = self.inputs["input_vector"].recv();
 
         let coefficients = self.parameters["coefficients"].get_value();
 
         if input_vector.is_empty() || coefficients.is_empty() {
-            return Err(kappa_library::stream_processor::StreamingError::InvalidInput);
+            return Err(processor_engine::stream_processor::StreamingError::InvalidInput);
         }
 
         let output_vector = self.fir_filter(&input_vector, &coefficients);

@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-kappa_library = {path = "../kappa_library"}
-stream_proc_macro = {path = "../kappa_library/src/stream_proc_macro"}
+processor_engine = {path = "../processor_engine"}
+stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}
 num-traits = "0.2.19"

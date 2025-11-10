@@ -1,6 +1,6 @@
 use std::os::raw::c_char;
-use kappa_library::modules::ModuleStruct;
-use kappa_library::modules::Version;
+use processor_engine::modules::ModuleStruct;
+use processor_engine::modules::Version;
 
 #[unsafe(no_mangle)]
 pub static MODULE: ModuleStruct  = ModuleStruct {

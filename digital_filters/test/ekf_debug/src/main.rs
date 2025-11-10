@@ -1,5 +1,5 @@
 use chrono::Utc;
-use kappa_library::stream_processor::{StreamProcessor, StreamBlock};
+use processor_engine::stream_processor::{StreamProcessor, StreamBlock};
 use filter::ekf::{EkfProcess, TimeTaggedSample};
 use rand::rand_core::le;
 

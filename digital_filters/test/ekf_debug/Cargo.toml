@@ -6,5 +6,5 @@ edition = "2024"
 [dependencies]
 chrono.workspace = true
 filter = {path = "../../"}
-kappa_library = {path = "../../../kappa_library"}
+processor_engine = {path = "../../../processor_engine"}
 rand.workspace = true
