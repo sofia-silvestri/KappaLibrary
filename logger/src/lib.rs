@@ -1,4 +1,3 @@
-use std::ffi::c_char;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::{fs, thread};

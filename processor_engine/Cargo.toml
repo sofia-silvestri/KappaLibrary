@@ -7,4 +7,3 @@ edition = "2021"
 connectors_macro = {path = "src/connectors_macro"}
 stream_proc_macro = {path = "src/stream_proc_macro"}
 num-traits = "0.2.19"
-libloading = "0.9.0"

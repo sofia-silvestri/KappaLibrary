@@ -1,10 +1,7 @@
-use std::result;
-
 use processor_engine::stream_processor::{StreamBlockDyn, StreamingError};
 use data_model::modules::ModuleStruct;
 use data_model::modules::Version;
 
-use crate::ekf::EkfFilter;
 use crate::ekf::EkfProcess;
 use crate::fir::FirFilter;
 use crate::iir::IirFilter;
