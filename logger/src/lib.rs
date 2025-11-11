@@ -31,15 +31,15 @@ pub enum LogLevel {
 }
 
 pub static MODULE: ModuleStruct  = ModuleStruct {
-    name: "logger\0".as_ptr()as *const c_char,
-    description: "Log service\0".as_ptr() as *const c_char,
-    authors: "Sofia Silvestri\0".as_ptr() as *const c_char,
-    release_date: "\0".as_ptr() as *const c_char,
+    name: "logger",
+    description: "Log service",
+    authors: "Sofia Silvestri",
+    release_date: "",
     version: Version{ major: 0,minor: 1,build: 0},
     dependency_number: 0,
     dependencies: &[],
     provides_number: 1,
-    provides: &["logger\0".as_ptr() as *const c_char],
+    provides: &["logger"],
 };
 
 #[derive(Clone)]

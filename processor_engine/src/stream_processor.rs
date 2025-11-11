@@ -20,6 +20,7 @@ pub enum StreamingError {
     InvalidParameter,
     InvalidInput,
     InvalidOutput,
+    InvalidProcessorBlock,
     OutOfRange,
     WrongType,
     PathError,

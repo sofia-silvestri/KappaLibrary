@@ -8,7 +8,7 @@ use processor_engine::connectors::{Input, Output, Parameter};
 use stream_proc_macro::StreamBlockMacro;
 
 #[derive(StreamBlockMacro)]
-pub struct FirFilter {
+pub struct IirFilter {
     inputs:     HashMap<&'static str, Box<Input<Vec<f64>>>>,
     outputs:    HashMap<&'static str, Box<Output<Vec<f64>>>>,
     parameters: HashMap<&'static str, Box<Parameter<Vec<f64>>>>,
@@ -16,7 +16,7 @@ pub struct FirFilter {
     lock: std::sync::Mutex<()>,
 }
 
-impl FirFilter
+impl IirFilter
 {
     pub fn new(n_coefficients: Vec<f64>, d_coefficients: Vec<f64>) -> Self {
         let mut inputs: HashMap<&'static str, Box<Input<Vec<f64>>>> = HashMap::new();
@@ -36,7 +36,7 @@ impl FirFilter
         parameters.insert("n_coefficients", n_coeff_param);
         let d_coeff_param = create_parameter!(Vec<f64>, "d_coefficients", "IIR Denominator Filter Coefficients", d_coefficients);
         parameters.insert("d_coefficients", d_coeff_param);
-        FirFilter {
+        IirFilter {
             inputs,
             outputs,
             parameters,
@@ -71,7 +71,7 @@ impl FirFilter
     }
 }
 
-impl StreamProcessor for FirFilter {
+impl StreamProcessor for IirFilter {
     fn process(&mut self) -> Result<(), processor_engine::stream_processor::StreamingError> {
         let input_vector = self.inputs["input_vector"].recv();
 
