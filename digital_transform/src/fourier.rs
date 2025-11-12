@@ -4,16 +4,17 @@ use std::ffi::c_char;
 use std::sync::{mpsc::Sender, Mutex};
 use std::any::Any;
 use num_traits::{Float, Zero};
-use processor_engine::{create_input, create_output, create_parameter};
+use serde::Serialize;
 use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
 use processor_engine::stream_processor::{StreamProcessorStruct, StreamingState};
 use processor_engine::connectors::{Input, Output, Parameter};
 use processor_engine::connectors::ConnectorsTrait;
 use stream_proc_macro::StreamBlockMacro;
 
-use data_model::{StaticsTrait, Statics, streaming_error::StreamingError};
+use data_model::memory_manager::{StaticsTrait, Statics};
+use data_model::streaming_error::StreamingError;
 use utils::math::{numbers::factorize, complex::Complex};
-
+use crate::MODULE_NAME;
 
 #[unsafe(no_mangle)]
 pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
@@ -21,7 +22,7 @@ pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
     description: b"Fast Fourier Transform Process Block\0".as_ptr() as *const c_char,
     input_number: 2,
     inputs: &[b"real_input\0".as_ptr() as *const c_char, b"complex_input\0".as_ptr() as *const c_char],
-    inputs_type: &[b"Vec<T>, Vec<Complex<T>>\0".as_ptr() as *const c_char],
+    inputs_type: &[b"Vec<V>, Vec<Complex<T>>\0".as_ptr() as *const c_char],
     output_number: 1,
     outputs: &[b"output\0".as_ptr() as *const c_char],
     outputs_type: &[b"Vec<Complex<T>>\0".as_ptr() as *const c_char],
@@ -30,7 +31,7 @@ pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
     parameters_type: &[b"FftInputType\0".as_ptr() as *const c_char],
 };
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Copy, Serialize)]
 pub enum FftInputType {
     Real,
     Complex,
@@ -142,6 +143,7 @@ pub struct FftProcess<T: 'static + Send + Clone> {
     outputs:     HashMap<&'static str, Box<dyn ConnectorsTrait>>,
     parameters:  HashMap<&'static str, Box<dyn ConnectorsTrait>>,
     statics:     HashMap<&'static str, Box<dyn StaticsTrait>>,
+    module_name: &'static str,
     state:       Mutex<StreamingState>,
     lock:        Mutex<()>,
     fft_planner: Fft<T>,
@@ -160,37 +162,29 @@ where
 {
     pub fn new() -> Self {
         let fft_planner = Fft::<T>::new(false, 2);
-        let mut inputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        inputs.insert(
-            "input",
-            create_input!(Vec<Complex<T>>, "complex_input", "Complex input Signal"),
-        );
-        inputs.insert(
-            "input_real",
-            create_input!(Vec<T>, "real_input", "Real input Signal"),
-        );
-        let mut outputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        outputs.insert(
-            "output",
-            create_output!(Vec<Complex<T>>, "output", "Output Complex Signal"),
-        );
-        let mut parameters: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        parameters.insert(
-            "fft_type_input",
-            create_parameter!(FftInputType, "fft_type_input", "FFT Input Type", FftInputType::Real),
-        );
-        let mut statics: HashMap<&'static str, Box<dyn StaticsTrait>> = HashMap::new();
-        statics.insert("fft_size", Box::new(Statics::<u32>::new(2)));
-        statics.insert("inverse", Box::new(Statics::<bool>::new(false)));
-        Self {
+        let inputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
+        let outputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
+        let parameters: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
+        let statics: HashMap<&'static str, Box<dyn StaticsTrait>> = HashMap::new();
+        let module_name: &'static str = Box::leak(format!("{}::{}", MODULE_NAME, "::fourier::FftProcess").into_boxed_str());
+        
+        let mut ret= Self {
             inputs,
             outputs,
             parameters,
+            module_name,
             statics,
             state: Mutex::new(StreamingState::Null),
             lock: Mutex::new(()),
             fft_planner,
-        }
+        };
+        ret.new_input::<Vec<Complex<T>>>("complex_input", "Complex input Signal").unwrap();
+        ret.new_input::<Vec<T>>("real_input", "Real input Signal").unwrap();
+        ret.new_output::<Vec<Complex<T>>>("output", "Output Complex Signal").unwrap();
+        ret.new_parameter::<FftInputType>("fft_type_input", "FFT Input Type", FftInputType::Real).unwrap();
+        ret.new_statics::<u32>("fft_size", "FFT Size", 2).unwrap();
+        ret.new_statics::<bool>("inverse", "Inverse FFT", false).unwrap();
+        ret
     }
 }
 
@@ -222,11 +216,7 @@ where
                         fft_size = fft_size_statics.get().clone() as usize;
                     }
                     &"inverse" => {
-                        let inverse_statics = self.statics.get(statics_key)
-                            .expect("Missing statics")
-                            .as_any()
-                            .downcast_ref::<Statics<bool>>()
-                            .unwrap();
+                        let inverse_statics = self.get_statics::<bool>("inverse")?;
                         if inverse_statics.is_settable() {
                             return Err(StreamingError::UnsetStatics);
                         }
@@ -258,7 +248,6 @@ where
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
