@@ -4,6 +4,56 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::Serialize;
 
+use crate::streaming_error::StreamingError;
+
+pub trait StaticsTrait {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> Option<&mut dyn Any>;
+    fn is_settable(&self) -> bool;
+}
+
+#[derive(Copy, Clone)]
+pub struct Statics<T: 'static> {
+    key: &'static str,
+    value: T,
+    settable: bool,
+}
+impl<T: 'static> StaticsTrait for Statics<T> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn Any> {
+        if self.settable {
+            Some(self)
+        } else {
+            None
+        }
+    }
+    fn is_settable(&self) -> bool {
+        self.settable
+    }
+}
+impl<T: 'static + Send + Sync + Copy + Serialize> Statics<T> {
+    pub fn new(key: &'static str, value: T) -> Self {
+        MemoryManager::get().lock().unwrap().register_state::<T>(key, value);
+        Self { key, value, settable: true }
+    }
+    pub fn set(&mut self, value: T) -> Result<(), StreamingError> {
+        if self.settable {
+            self.value = value;
+            self.settable = false;
+            MemoryManager::get().lock().unwrap().register_state::<T>(self.key, self.value);
+            Ok(())
+        } else {
+            Err(StreamingError::InvalidOperation)
+        }
+    }
+    pub fn get(&self) -> &T {
+        &self.value
+    }
+}
+
 trait StateTrait: Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
