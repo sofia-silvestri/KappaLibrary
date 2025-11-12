@@ -1,8 +1,9 @@
+
 pub mod modules;
 pub mod streaming_error;
+pub mod memory_manager;
 
 use std::any::Any;
-
 use crate::streaming_error::StreamingError;
 
 
@@ -50,4 +51,3 @@ impl<T: 'static> Statics<T> {
         &self.value
     }
 }
-
