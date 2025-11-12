@@ -6,8 +6,9 @@ use std::time::Duration;
 use std::hash::{Hash,DefaultHasher, Hasher};
 
 use crate::connectors::{Input, Output, Parameter};
-use data_model::Statics;
+use data_model::memory_manager::Statics;
 use data_model::streaming_error::StreamingError;
+use serde::Serialize;
 
 #[derive(PartialEq)]
 pub enum StreamingState {
@@ -19,20 +20,20 @@ pub enum StreamingState {
 
 #[derive(Clone)]
 pub struct DataHeader {
-    key: u64,
-    name: String,
-    description: String,
+    pub key: u64,
+    pub name: &'static str,
+    pub description: &'static str,
     data_type: TypeId,
 }
 
 impl DataHeader {
-    pub fn new(name: &str, description: &str, type_id: TypeId) -> Self {
+    pub fn new(name: &'static str, description: &'static str, type_id: TypeId) -> Self {
         let mut hasher = DefaultHasher::new();
-        name.to_string().hash(&mut hasher);
+        name.hash(&mut hasher);
         Self {
             key: hasher.finish(),
-            name: name.to_string(),
-            description: description.to_string(),
+            name,
+            description,
             data_type: type_id,
         }
     }
@@ -52,15 +53,19 @@ impl DataHeader {
 
 
 pub trait StreamBlock {
-    fn get_input<T: Send> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
-    fn get_output<T: Send> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
-    fn get_parameter<T: Send> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
+    fn new_input<T: 'static + Send> (&mut self, key: &'static str, description: &'static str) -> Result<(), StreamingError>;
+    fn new_output<T: 'static + Send + Clone> (&mut self, key: &'static str, description: &'static str) -> Result<(), StreamingError>;
+    fn new_parameter<T: 'static + Send + Sync + Copy + Clone + Serialize + PartialOrd> (&mut self, key: &'static str, description: &'static str, value: T) -> Result<(), StreamingError>;
+    fn new_statics<T: 'static + Send + Sync + Copy + Serialize> (&mut self, key: &'static str, description: &'static str, value: T) -> Result<(), StreamingError>;
+    fn get_input<T: 'static + Send> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
+    fn get_output<T: 'static + Send> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
+    fn get_parameter<T: Send + Sync + Copy + Clone + Serialize> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
     fn get_statics<T> (&self, key: &str) -> Result<&Statics<T>, StreamingError>;
     fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&Sender<T>, StreamingError>;
     fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: Sender<T>) -> Result<(), StreamingError>;
-    fn get_parameter_value<T: 'static + Send + PartialOrd + Clone>(&self, key: &str) -> Result<T, StreamingError>;
-    fn set_parameter_value<T:'static + Send + PartialOrd + Clone>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
-    fn set_statics_value<T:'static>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn get_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync>(&self, key: &str) -> Result<T, StreamingError>;
+    fn set_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn set_statics_value<T: 'static + Send + Clone + Copy + Serialize + Sync>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
 }
 
 pub trait StreamBlockDyn {
@@ -73,6 +78,7 @@ pub trait StreamBlockDyn {
     fn get_parameter_list(&self) -> Vec<&str>;
     fn get_statics_list(&self) -> Vec<&str>;
     fn is_initialized(&self) -> bool;
+    fn get_qualified_name(&self, name: &str) -> &'static str;
 }
 
 pub trait StreamProcessor: StreamBlockDyn {

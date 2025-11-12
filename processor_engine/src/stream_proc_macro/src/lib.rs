@@ -9,7 +9,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
     let generics = &ast.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let mut field_presence = vec![false; 6];
+    let mut field_presence = vec![false; 7];
     let fields_names =match &ast.data {
         syn::Data::Struct(data_struct) => {
             for field in &data_struct.fields {
@@ -19,8 +19,9 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                         "outputs" => field_presence[1] = true,
                         "parameters" => field_presence[2] = true,
                         "statics" => field_presence[3] = true,
-                        "state" => field_presence[4] = true,
-                        "lock" => field_presence[5] = true,
+                        "module_name" => field_presence[4] = true,
+                        "state" => field_presence[5] = true,
+                        "lock" => field_presence[6] = true,
                         _ => {}
                     }
                 }
@@ -76,9 +77,40 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 }
                 return true;
             }
+            fn get_qualified_name(&self, name: &str) -> &'static str {
+                Box::leak(format!("{}::{}", self.module_name, name).into_boxed_str())
+            }
         }
-        impl #impl_generics StreamBlock for #name #ty_generics #where_clause 
+        impl #impl_generics StreamBlock for #name #ty_generics #where_clause
         {
+            fn new_input<V: 'static + Send>(&mut self, key: &'static str, description: &'static str) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                match self.inputs.insert(key, Box::new(Input::<V>::new(qualified_name, description))) {
+                    Some(_) => Ok(()),
+                    None => Err(StreamingError::InvalidOperation)
+                }
+            }
+            fn new_output<V: 'static + Send + Clone> (&mut self, key: &'static str, description: &'static str) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                match self.outputs.insert(key, Box::new(Output::<V>::new(qualified_name, description))) {
+                    Some(_) => Ok(()),
+                    None => Err(StreamingError::InvalidOperation)
+                }
+            }
+            fn new_parameter<V: 'static + Send + Sync + Copy + Clone + Serialize + PartialOrd> (&mut self, key: &'static str, description: &'static str, value: V) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                match self.parameters.insert(key, Box::new(Parameter::<V>::new(qualified_name, description, value))) {
+                    Some(_) => Ok(()),
+                    None => Err(StreamingError::InvalidOperation)
+                }
+            }
+            fn new_statics<V: 'static + Send + Sync + Copy + Serialize> (&mut self, key: &'static str, description: &'static str, value: V) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                match self.statics.insert(key, Box::new(Statics::<V>::new(qualified_name, value))) {
+                    Some(_) => Ok(()),
+                    None => Err(StreamingError::InvalidOperation)
+                }
+            }
             fn get_input<V: Send> (&self, key: &str) -> Result<&Input<V>, StreamingError> {
                 if let Some(container) = self.inputs.get(key) {
                     let any_ref: &dyn Any = container.as_ref();
@@ -103,7 +135,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidOutput)
                 }
             }
-            fn get_parameter<V: Send> (&self, key: &str) -> Result<&Parameter<V>, StreamingError> {
+            fn get_parameter<V : Send + Sync + 'static + Copy + Serialize> (&self, key: &str) -> Result<&Parameter<V>, StreamingError> {
                 if let Some(container) = self.parameters.get(key) {
                     let any_ref: &dyn Any = container.as_ref();
                     if let Some(param) = any_ref.downcast_ref::<Parameter<V>>() {
@@ -153,7 +185,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidOutput)
                 }
             }
-            fn get_parameter_value<V:'static + Send + PartialOrd + Clone>(&self, key: &str) -> Result<V, StreamingError> {
+            fn get_parameter_value<V:'static + Send + PartialOrd + Clone + Copy + Serialize + Sync>(&self, key: &str) -> Result<V, StreamingError> {
                 if let Some(container) = self.parameters.get(key) {
                     let any_ref: &dyn Any = container.as_ref();
                     if let Some(param) = any_ref.downcast_ref::<Parameter<V>>() {
@@ -165,7 +197,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidParameter)
                 }
             }
-            fn set_parameter_value<V:'static + Send + PartialOrd + Clone>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn set_parameter_value<V:'static + Send + PartialOrd + Clone + Copy + Serialize + Sync>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
                 if let Some(container) = self.parameters.get_mut(key) {
                     let any_mut: &mut dyn Any = container.as_mut();
                     if let Some(param) = any_mut.downcast_mut::<Parameter<V>>() {
@@ -178,7 +210,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidParameter)
                 }
             }
-            fn set_statics_value<V:'static>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn set_statics_value<V:'static + Send + Clone + Copy + Serialize + Sync>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
                 if let Some(container) = self.statics.get_mut(key) {
                     let any_mut = container.as_mut().as_any_mut();
                     match any_mut {
