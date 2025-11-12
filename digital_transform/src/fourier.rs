@@ -9,10 +9,9 @@ use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProc
 use processor_engine::stream_processor::{StreamProcessorStruct, StreamingState};
 use processor_engine::connectors::{Input, Output, Parameter};
 use processor_engine::connectors::ConnectorsTrait;
-use data_model::streaming_error::StreamingError;
 use stream_proc_macro::StreamBlockMacro;
 
-use data_model::{StaticsTrait, Statics};
+use data_model::{StaticsTrait, Statics, streaming_error::StreamingError};
 use utils::math::{numbers::factorize, complex::Complex};
 
 
@@ -243,34 +242,19 @@ where
 
     }
     fn process(&mut self) -> Result<(), StreamingError> {
-        let fft_input = self.get_parameter<FftInputType>("fft_type_input")?.get_value().clone();
+        let fft_input = self.get_parameter::<FftInputType>("fft_type_input").expect("").get_value().clone();
         let _guard = self.lock.lock().unwrap();
         let fft_result: Vec<Complex<T>>;
         if fft_input == FftInputType::Real {
-            let input_real = self.inputs.get("real_input")
-                .expect("Missing input")
-                .as_any()
-                .downcast_ref::<Input<Vec<T>>>()
-                .unwrap()
-                .recv();
+            let input_real = self.get_input::<Vec::<T>>("real_input").expect("").recv();
             let _guard = self.state.lock().unwrap();
             fft_result = self.fft_planner.fft_real(&input_real);
         } else {
-            let input_complex = self.inputs.get("input")
-                .expect("Missing input")
-                .as_any()
-                .downcast_ref::<Input<Vec<Complex<T>>>>()
-                .unwrap()
-                .recv();
+            let input_complex = self.get_input::<Vec::<Complex::<T>>>("input").expect("").recv();
             let _guard = self.state.lock().unwrap();
             fft_result = self.fft_planner.fft_complex(&input_complex);
         }
-        self.outputs.get_mut("output")
-            .expect("Missing output")
-            .as_any_mut()
-            .downcast_mut::<Output<Vec<Complex<T>>>>()
-            .unwrap()
-            .send(fft_result);
+        self.get_output("output").unwrap().send(fft_result);
         Ok(())
     }
 }

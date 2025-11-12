@@ -105,18 +105,13 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidParameter)
                 }
             }
-            fn get_statics<V: Send> (&mut self, key: &str) -> Result<&Statics<V>, StreamingError> {
+            fn get_statics<V> (&self, key: &str) -> Result<&Statics<V>, StreamingError> {
                 if let Some(container) = self.statics.get(key) {
-                    let any_ref = *container.as_any_mut();
-                    match any_ref {
-                        None => Err(StreamingError::InvalidOperation),
-                        Some(any_ref) => {
-                            if let Some(statics) = any_ref.downcast_ref::<Statics<V>>() {
-                                Ok(statics)
-                            } else {
-                                Err(StreamingError::WrongType)
-                            }
-                        }
+                    let any_ref: &dyn Any = container.as_any();
+                    if let Some(statics) = any_ref.downcast_ref::<Statics<V>>() {
+                        Ok(statics)
+                    } else {
+                        Err(StreamingError::WrongType)
                     }
                 } else {
                     Err(StreamingError::InvalidStatics)
