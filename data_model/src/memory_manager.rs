@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::any::Any;
 use std::sync::{Mutex, OnceLock};
+use std::fmt::Display;
 
 use serde::Serialize;
 
@@ -12,7 +13,7 @@ pub trait StaticsTrait {
     fn is_settable(&self) -> bool;
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Statics<T: 'static> {
     key: &'static str,
     value: T,
@@ -34,6 +35,16 @@ impl<T: 'static> StaticsTrait for Statics<T> {
         self.settable
     }
 }
+
+impl<T> Display for Statics<T>
+where
+    T: 'static + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 impl<T: 'static + Send + Sync + Copy + Serialize> Statics<T> {
     pub fn new(key: &'static str, value: T) -> Self {
         MemoryManager::get().lock().unwrap().register_state::<T>(key, value);

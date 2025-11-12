@@ -14,7 +14,7 @@ use stream_proc_macro::StreamBlockMacro;
 use data_model::memory_manager::{StaticsTrait, Statics};
 use data_model::streaming_error::StreamingError;
 use utils::math::{numbers::factorize, complex::Complex};
-use crate::MODULE_NAME;
+
 
 #[unsafe(no_mangle)]
 pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
@@ -143,7 +143,7 @@ pub struct FftProcess<T: 'static + Send + Clone> {
     outputs:     HashMap<&'static str, Box<dyn ConnectorsTrait>>,
     parameters:  HashMap<&'static str, Box<dyn ConnectorsTrait>>,
     statics:     HashMap<&'static str, Box<dyn StaticsTrait>>,
-    module_name: &'static str,
+    module_name: Statics<&'static str>,
     state:       Mutex<StreamingState>,
     lock:        Mutex<()>,
     fft_planner: Fft<T>,
@@ -160,20 +160,20 @@ where
     + Debug
     + Display,
 {
-    pub fn new() -> Self {
+    pub fn new(name: &'static str) -> Self {
         let fft_planner = Fft::<T>::new(false, 2);
         let inputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         let outputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         let parameters: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         let statics: HashMap<&'static str, Box<dyn StaticsTrait>> = HashMap::new();
-        let module_name: &'static str = Box::leak(format!("{}::{}", MODULE_NAME, "::fourier::FftProcess").into_boxed_str());
+        let module_name: &'static str = Box::leak(format!("{}.{}", "FftProcess", name).into_boxed_str());
         
         let mut ret= Self {
             inputs,
             outputs,
             parameters,
-            module_name,
             statics,
+            module_name: Statics::new("FftProcess", "module_name"),
             state: Mutex::new(StreamingState::Null),
             lock: Mutex::new(()),
             fft_planner,
@@ -184,6 +184,10 @@ where
         ret.new_parameter::<FftInputType>("fft_type_input", "FFT Input Type", FftInputType::Real).unwrap();
         ret.new_statics::<u32>("fft_size", "FFT Size", 2).unwrap();
         ret.new_statics::<bool>("inverse", "Inverse FFT", false).unwrap();
+        match ret.module_name.set(module_name) {
+            Ok(_) => {},
+            Err(e) => {panic!("Failed to set module name statics: {}", e);}
+        }
         ret
     }
 }

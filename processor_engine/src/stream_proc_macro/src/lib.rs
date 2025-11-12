@@ -78,7 +78,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 return true;
             }
             fn get_qualified_name(&self, name: &str) -> &'static str {
-                Box::leak(format!("{}::{}", self.module_name, name).into_boxed_str())
+                Box::leak(format!("{}.{}", self.module_name, name).into_boxed_str())
             }
         }
         impl #impl_generics StreamBlock for #name #ty_generics #where_clause
