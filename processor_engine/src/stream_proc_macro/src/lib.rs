@@ -66,6 +66,16 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
             fn get_statics_list(&self) -> Vec<&str>{
                 self.statics.keys().copied().collect()
             }
+            fn is_initialized(&self) -> bool {
+                let keys = self.get_statics_list();
+                for k in keys {
+                    let statics_dyn = self.statics.get(k).unwrap();
+                    if statics_dyn.is_settable() {
+                        return false;
+                    }
+                }
+                return true;
+            }
         }
         impl #impl_generics StreamBlock for #name #ty_generics #where_clause 
         {

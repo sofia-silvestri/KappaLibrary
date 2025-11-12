@@ -9,6 +9,7 @@ use crate::streaming_error::StreamingError;
 pub trait StaticsTrait {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> Option<&mut dyn Any>;
+    fn is_settable(&self) -> bool;
 }
 
 #[derive(Copy, Clone)]
@@ -28,6 +29,9 @@ impl<T: 'static> StaticsTrait for Statics<T> {
             None
         }
     }
+    fn is_settable(&self) -> bool {
+        self.settable
+    }
 }
 impl<T: 'static> Statics<T> {
     pub fn new(value: T) -> Self {
@@ -44,9 +48,6 @@ impl<T: 'static> Statics<T> {
     }
     pub fn get(&self) -> &T {
         &self.value
-    }
-    pub fn is_settable(&self) -> bool {
-        self.settable
     }
 }
 

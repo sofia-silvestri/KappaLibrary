@@ -72,12 +72,16 @@ pub trait StreamBlockDyn {
     fn get_output_list(&self) -> Vec<&str>;
     fn get_parameter_list(&self) -> Vec<&str>;
     fn get_statics_list(&self) -> Vec<&str>;
+    fn is_initialized(&self) -> bool;
 }
 
 pub trait StreamProcessor: StreamBlockDyn {
     fn init(&mut self) -> Result<(), StreamingError >{
         if self.check_state(StreamingState::Running) {
             return Err(StreamingError::InvalidStateTransition)
+        }
+        if !self.is_initialized() {
+            return Err(StreamingError::InvalidStatics)
         }
         self.set_state(StreamingState::Initial);
         Ok(())
