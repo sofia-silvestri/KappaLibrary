@@ -1,16 +1,18 @@
 use std::fmt::{Debug, Display};
 use std::collections::HashMap;
 use std::ffi::c_char;
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Mutex};
 use std::any::Any;
 use num_traits::{Float, Zero};
 use processor_engine::{create_input, create_output, create_parameter};
-use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor, StreamProcessorStruct};
-use processor_engine::stream_processor::{StreamingError, StreamingState};
+use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
+use processor_engine::stream_processor::{StreamProcessorStruct, StreamingState};
 use processor_engine::connectors::{Input, Output, Parameter};
 use processor_engine::connectors::ConnectorsTrait;
+use data_model::streaming_error::StreamingError;
 use stream_proc_macro::StreamBlockMacro;
 
+use data_model::{StaticsTrait, Statics};
 use utils::math::{numbers::factorize, complex::Complex};
 
 
@@ -32,9 +34,9 @@ pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum FftInputType {
     Real,
-
+    Complex,
 }
-
+unsafe impl Send for FftInputType {}
 pub struct Fft<T> {
     size: usize,
     weights: Vec<Complex<T>>,
@@ -137,11 +139,12 @@ where
 
 #[derive(StreamBlockMacro)]
 pub struct FftProcess<T: 'static + Send + Clone> {
-    inputs:     HashMap<&'static str, Box<dyn ConnectorsTrait>>,
-    outputs:    HashMap<&'static str, Box<Output<Vec<Complex<T>>>>>,
-    parameters: HashMap<&'static str, Box<Parameter<FftInputType>>>,
-    state: std::sync::Mutex<StreamingState>,
-    lock: std::sync::Mutex<()>,
+    inputs:      HashMap<&'static str, Box<dyn ConnectorsTrait>>,
+    outputs:     HashMap<&'static str, Box<dyn ConnectorsTrait>>,
+    parameters:  HashMap<&'static str, Box<dyn ConnectorsTrait>>,
+    statics:     HashMap<&'static str, Box<dyn StaticsTrait>>,
+    state:       Mutex<StreamingState>,
+    lock:        Mutex<()>,
     fft_planner: Fft<T>,
 }
 
@@ -156,8 +159,8 @@ where
     + Debug
     + Display,
 {
-    pub fn new(size: usize, inverse: bool) -> Self {
-        let fft_planner = Fft::<T>::new(inverse, size);
+    pub fn new() -> Self {
+        let fft_planner = Fft::<T>::new(false, 2);
         let mut inputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         inputs.insert(
             "input",
@@ -167,22 +170,26 @@ where
             "input_real",
             create_input!(Vec<T>, "real_input", "Real input Signal"),
         );
-        let mut outputs: HashMap<&'static str, Box<Output<Vec<Complex<T>>>>> = HashMap::new();
+        let mut outputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         outputs.insert(
             "output",
             create_output!(Vec<Complex<T>>, "output", "Output Complex Signal"),
         );
-        let mut parameters: HashMap<&'static str, Box<Parameter<FftInputType>>> = HashMap::new();
+        let mut parameters: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
         parameters.insert(
             "fft_type_input",
             create_parameter!(FftInputType, "fft_type_input", "FFT Input Type", FftInputType::Real),
         );
+        let mut statics: HashMap<&'static str, Box<dyn StaticsTrait>> = HashMap::new();
+        statics.insert("fft_size", Box::new(Statics::<u32>::new(2)));
+        statics.insert("inverse", Box::new(Statics::<bool>::new(false)));
         Self {
             inputs,
             outputs,
             parameters,
-            state: std::sync::Mutex::new(StreamingState::Stopped),
-            lock: std::sync::Mutex::new(()),
+            statics,
+            state: Mutex::new(StreamingState::Null),
+            lock: Mutex::new(()),
             fft_planner,
         }
     }
@@ -199,15 +206,46 @@ where
         + Debug
         + Display,
 {
+    fn init(&mut self) -> Result<(), StreamingError > {
+        if self.check_state(StreamingState::Running) {
+            return Err(StreamingError::InvalidStateTransition)
+        }
+        if self.check_state(StreamingState::Null) {
+            let mut fft_size: usize = 0;
+            let mut inverse: bool = false;
+            for statics_key in self.statics.keys() {
+                match statics_key {
+                    &"fft_size" => {
+                        let fft_size_statics = self.get_statics::<u32>("fft_size")?;
+                        if fft_size_statics.is_settable() {
+                            return Err(StreamingError::UnsetStatics);
+                        }
+                        fft_size = fft_size_statics.get().clone() as usize;
+                    }
+                    &"inverse" => {
+                        let inverse_statics = self.statics.get(statics_key)
+                            .expect("Missing statics")
+                            .as_any()
+                            .downcast_ref::<Statics<bool>>()
+                            .unwrap();
+                        if inverse_statics.is_settable() {
+                            return Err(StreamingError::UnsetStatics);
+                        }
+                        inverse = inverse_statics.get().clone();
+                    }
+                    _ => {}
+                }
+            }
+            self.fft_planner = Fft::<T>::new(inverse, fft_size);
+        }
+        self.set_state(StreamingState::Initial);
+        Ok(())
+
+    }
     fn process(&mut self) -> Result<(), StreamingError> {
-        let fft_input = self.parameters.get("fft_type_input")
-            .expect("Missing parameter")
-            .as_any()
-            .downcast_ref::<Parameter<FftInputType>>()
-            .unwrap()
-            .get_value()
-            .clone();
+        let fft_input = self.get_parameter<FftInputType>("fft_type_input")?.get_value().clone();
         let _guard = self.lock.lock().unwrap();
+        let fft_result: Vec<Complex<T>>;
         if fft_input == FftInputType::Real {
             let input_real = self.inputs.get("real_input")
                 .expect("Missing input")
@@ -216,10 +254,7 @@ where
                 .unwrap()
                 .recv();
             let _guard = self.state.lock().unwrap();
-            let fft_result = self.fft_planner.fft_real(&input_real);
-            self.outputs.get_mut("output")
-                .expect("Missing output")
-                .send(fft_result);
+            fft_result = self.fft_planner.fft_real(&input_real);
         } else {
             let input_complex = self.inputs.get("input")
                 .expect("Missing input")
@@ -228,11 +263,14 @@ where
                 .unwrap()
                 .recv();
             let _guard = self.state.lock().unwrap();
-            let fft_result = self.fft_planner.fft_complex(&input_complex);
-            self.outputs.get_mut("output")
-                .expect("Missing output")
-                .send(fft_result);
+            fft_result = self.fft_planner.fft_complex(&input_complex);
         }
+        self.outputs.get_mut("output")
+            .expect("Missing output")
+            .as_any_mut()
+            .downcast_mut::<Output<Vec<Complex<T>>>>()
+            .unwrap()
+            .send(fft_result);
         Ok(())
     }
 }

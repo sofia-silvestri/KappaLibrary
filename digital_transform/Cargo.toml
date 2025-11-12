@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 processor_engine = {path = "../processor_engine"}
 stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}
+data_model = {path = "../data_model"}
 utils = {path = "../utils"}
 num-traits = "0.2.19"
