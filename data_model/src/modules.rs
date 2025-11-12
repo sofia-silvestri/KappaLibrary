@@ -1,7 +1,5 @@
 use libloading::Library;
 
-use processor_engine::stream_processor::StreamProcessor;
-
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Version {
@@ -17,9 +15,6 @@ pub struct Dependency {
     pub version: Version,
 }
 
-pub trait ModulesTrait {
-    fn get_processor_modules(&self, name: &str) -> Box<dyn StreamProcessor>;
-}
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ModuleStruct {

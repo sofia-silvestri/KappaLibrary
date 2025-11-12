@@ -5,28 +5,16 @@ use std::thread;
 use std::time::Duration;
 use std::hash::{Hash,DefaultHasher, Hasher};
 
+use crate::connectors::{Input, Output, Parameter};
+use data_model::Statics;
+use data_model::streaming_error::StreamingError;
+
 #[derive(PartialEq)]
 pub enum StreamingState {
     Null,
     Initial,
     Running,
     Stopped,
-}
-
-#[derive(Debug)]
-pub enum StreamingError {
-    Ok,
-    InvalidStateTransition,
-    InvalidParameter,
-    InvalidInput,
-    InvalidOutput,
-    InvalidProcessorBlock,
-    OutOfRange,
-    WrongType,
-    PathError,
-    CreateError,
-    ReadError,
-    WriteError,
 }
 
 #[derive(Clone)]
@@ -64,10 +52,15 @@ impl DataHeader {
 
 
 pub trait StreamBlock {
+    fn get_input<T: Send> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
+    fn get_output<T: Send> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
+    fn get_parameter<T: Send> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
+    fn get_statics<T> (&self, key: &str) -> Result<&Statics<T>, StreamingError>;
     fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&Sender<T>, StreamingError>;
     fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: Sender<T>) -> Result<(), StreamingError>;
     fn get_parameter_value<T: 'static + Send + PartialOrd + Clone>(&self, key: &str) -> Result<T, StreamingError>;
     fn set_parameter_value<T:'static + Send + PartialOrd + Clone>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn set_statics_value<T:'static>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
 }
 
 pub trait StreamBlockDyn {
@@ -78,6 +71,7 @@ pub trait StreamBlockDyn {
     fn get_input_list(&self) -> Vec<&str>;
     fn get_output_list(&self) -> Vec<&str>;
     fn get_parameter_list(&self) -> Vec<&str>;
+    fn get_statics_list(&self) -> Vec<&str>;
 }
 
 pub trait StreamProcessor: StreamBlockDyn {

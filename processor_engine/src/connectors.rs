@@ -2,7 +2,8 @@ use std::any::{Any,TypeId};
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::{Arc, Mutex};
 use connectors_macro::ConnectorMacro;
-use crate::stream_processor::{DataHeader, StreamingError};
+use data_model::streaming_error::StreamingError;
+use crate::stream_processor::DataHeader;
 
 pub trait ConnectorsTrait : 'static + Any + Send {
     fn as_any(&self) -> &dyn Any;
