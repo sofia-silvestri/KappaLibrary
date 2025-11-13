@@ -5,9 +5,9 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
-use crate::streaming_error::StreamingError;
+use crate::streaming_error::{StreamingState, StreamingError};
 
-pub trait StaticsTrait {
+pub trait StaticsTrait : Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> Option<&mut dyn Any>;
     fn is_settable(&self) -> bool;
@@ -19,7 +19,9 @@ pub struct Statics<T: 'static> {
     value: T,
     settable: bool,
 }
-impl<T: 'static> StaticsTrait for Statics<T> {
+impl<T: 'static> StaticsTrait for Statics<T> 
+where T: Send + Sync
+{
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -73,12 +75,13 @@ trait StateTrait: Send + Sync {
 
 #[derive(Clone, Copy, Serialize)]
 pub struct State<T: 'static + Send> {
+    name: &'static str,
     data: T,
 }
 
 impl<T> State<T> where T: Send {
-    pub fn new(data:T) -> Self {
-        Self { data }
+    pub fn new(name: &'static str, data:T) -> Self {
+        Self { name, data }
     }
     
 }
@@ -98,34 +101,66 @@ impl<T: Send + Sync+ Serialize> StateTrait for State<T>{
     }
 }
 
+pub trait StreamBlockDyn : Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn check_state(&self, state: StreamingState) -> bool;
+    fn set_state(&mut self, state: StreamingState);
+    fn get_input_list(&self) -> Vec<&str>;
+    fn get_output_list(&self) -> Vec<&str>;
+    fn get_parameter_list(&self) -> Vec<&str>;
+    fn get_statics_list(&self) -> Vec<&str>;
+    fn is_initialized(&self) -> bool;
+    fn get_qualified_name(&self, name: &str) -> &'static str;
+}
+
+
 pub struct MemoryManager {
-    mapped_memory: HashMap<&'static str, Box<dyn StateTrait>>,
+    mapped_state:       HashMap<&'static str, Box<dyn StateTrait>>,
+    mapped_statics:     HashMap<&'static str, Box<dyn StaticsTrait>>,
+    mapped_proc_block:  HashMap<&'static str, Box<dyn StreamBlockDyn>>
 }
 
 impl MemoryManager {
     fn new() -> Self {
         Self {
-            mapped_memory: HashMap::new()
+            mapped_state:       HashMap::new(),
+            mapped_statics:     HashMap::new(),
+            mapped_proc_block:  HashMap::new()
         }
     }
 
     pub fn get() -> &'static Mutex<MemoryManager> {
         MEMORY_MANAGER.get_or_init( || Mutex::new(MemoryManager::new()))
     }
-    pub fn register_state<T:Send + Copy+ Sync + Serialize>(&mut self, key: &'static str, value: T)
+    pub fn register_state<T: Send + Copy+ Sync + Serialize>(&mut self, key: &'static str, value: T)
         -> State<T>
     {
         let mm = MemoryManager::get();
-        let state = State::<T>::new(value);
+        let state = State::<T>::new(key, value);
         let boxed = Box::new(state);
-        mm.lock().unwrap().mapped_memory.insert(key, boxed);
+        mm.lock().unwrap().mapped_state.insert(key, boxed);
         state
     }
 
+    pub fn register_static<T: Send + Copy+ Sync + Serialize>(&mut self, key: &'static str, value: T) -> Statics<T>
+    {
+        let mm = MemoryManager::get();
+        let statics = Statics::<T>::new(key, value);
+        let boxed = Box::new(statics);
+        mm.lock().unwrap().mapped_statics.insert(key, boxed);
+        statics
+    }
+    pub fn register_module<T: Send + Copy+ Sync + Serialize>(&mut self, key: &'static str, block: Box<dyn StreamBlockDyn>)
+    {
+        let mm = MemoryManager::get();
+        mm.lock().unwrap().mapped_proc_block.insert(key, block);
+        
+    }
     pub fn serialize_all() -> Result<String, String>{
         let mm = MemoryManager::get();
         let mut json_string: String = "".to_string();
-        for m in mm.lock().unwrap().mapped_memory.iter() {
+        for m in mm.lock().unwrap().mapped_state.iter() {
             match m.1.serialize() {
                 Ok(json) => {json_string += &json;}
                 Err(e) => {return Err(format!("{}", e));}
