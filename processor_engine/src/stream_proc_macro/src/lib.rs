@@ -34,7 +34,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
     if !fields_names {
         return syn::Error::new_spanned(
             name,
-            "Struct must have 'inputs', 'outputs', 'parameters', 'statics', 'state', and 'lock' fields to derive ConnectorsTrait.",
+            "Struct must have 'inputs', 'outputs', 'parameters', 'statics', 'state', and 'lock' fields to derive MemoryVarTraid.",
         )
         .to_compile_error()
         .into();
@@ -135,7 +135,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidOutput)
                 }
             }
-            fn get_parameter<V : Send + Sync + 'static + Copy + Serialize> (&self, key: &str) -> Result<&Parameter<V>, StreamingError> {
+            fn get_parameter<V : Send + Sync + 'static + Copy + Display> (&self, key: &str) -> Result<&Parameter<V>, StreamingError> {
                 if let Some(container) = self.parameters.get(key) {
                     let any_ref: &dyn Any = container.as_ref();
                     if let Some(param) = any_ref.downcast_ref::<Parameter<V>>() {
@@ -147,7 +147,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidParameter)
                 }
             }
-            fn get_statics<V> (&self, key: &str) -> Result<&Statics<V>, StreamingError> {
+            fn get_statics<V: 'static + Send + Sync + Display> (&self, key: &str) -> Result<&Statics<V>, StreamingError> {
                 if let Some(container) = self.statics.get(key) {
                     let any_ref: &dyn Any = container.as_any();
                     if let Some(statics) = any_ref.downcast_ref::<Statics<V>>() {

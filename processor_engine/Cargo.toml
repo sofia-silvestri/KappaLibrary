@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-connectors_macro = {path = "src/connectors_macro"}
+memory_var_macro = {path = "../data_model/src/memory_var_macro"}
 stream_proc_macro = {path = "src/stream_proc_macro"}
 data_model = {path = "../data_model"}
 num-traits = "0.2.19"

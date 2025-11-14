@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(ConnectorMacro)]
+#[proc_macro_derive(MemoryVarMacro)]
 pub fn connector_macro_derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let name = &ast.ident; 
@@ -12,9 +12,9 @@ pub fn connector_macro_derive(input: TokenStream) -> TokenStream {
     let _ = generics.params.iter().next().map(|param| {
         match param {
             syn::GenericParam::Type(type_param) => type_param.ident.clone(),
-            _ => panic!("Traits connector type shall be generic."),
+            _ => panic!("Traits object type shall be generic."),
         }
-    }).unwrap_or_else(|| panic!("Traits connector type shall be generic on a type."));
+    }).unwrap_or_else(|| panic!("Traits object type shall be generic on a type."));
     
     let mut has_header_field = false;
     let fields_names =match &ast.data {
@@ -33,7 +33,7 @@ pub fn connector_macro_derive(input: TokenStream) -> TokenStream {
     if !fields_names {
         return syn::Error::new_spanned(
             name,
-            "Struct must have 'header' field to derive ConnectorsTrait.",
+            "Struct must have 'header' field to derive MemoryVarTraid.",
         )
         .to_compile_error()
         .into();
@@ -42,9 +42,16 @@ pub fn connector_macro_derive(input: TokenStream) -> TokenStream {
     let code_gen = quote! {
         //#fields_types
 
-        impl #impl_generics ConnectorsTrait for #name #ty_generics where #where_clause {
+        impl #impl_generics DataTrait for #name #ty_generics where #where_clause {
             fn as_any(&self) -> &dyn Any {self}
             fn as_any_mut(&mut self) -> &mut dyn Any {self}
+            fn get_header(&self) -> &DataHeader {&self.header}
+            fn serialize(&self) -> String {
+                let mut result = String::new();
+                result.push_str(&format!("\"name\" : \"{}\",\n", self.header.name));
+                result.push_str(&format!("\"value\" : \"{}\"\n", self.value));
+                result
+            }
         }
     };
 
