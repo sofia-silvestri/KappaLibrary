@@ -29,6 +29,7 @@ pub enum StreamingError {
     CreateError,
     ReadError,
     WriteError,
+    TaskError,
 }
 
 impl std::fmt::Display for StreamingError {
