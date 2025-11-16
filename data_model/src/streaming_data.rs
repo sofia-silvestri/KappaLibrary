@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq)]
 
 #[repr(C)]
-pub struct KappaStatistics {
+pub struct TaskStatistics {
     pub timestamp: f64,
     pub mean: f64,
     pub max: f64,
@@ -12,7 +12,7 @@ pub struct KappaStatistics {
     pub p99: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StreamingState {
     Null,
     Initial,

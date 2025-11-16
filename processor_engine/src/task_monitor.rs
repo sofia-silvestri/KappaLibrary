@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use data_model::streaming_data::StreamingError;
 use libc::{clock_gettime, clockid_t, pthread_getcpuclockid, pthread_self, pthread_t, timespec};
 use utils::math::statistics::{mean, std_deviation, percentile};
-use data_model::streaming_data::KappaStatistics;
+use data_model::streaming_data::TaskStatistics;
 
 #[repr(C)]
 #[derive(Clone)]
@@ -65,7 +65,7 @@ impl Task {
         }
         Ok(())
     }
-    pub fn get_stats(&self) -> KappaStatistics {
+    pub fn get_stats(&self) -> TaskStatistics {
         let timestamp = Utc::now();
         let mut data: Vec<f64> = self.occupacy.iter().cloned().collect();
         let mean = mean::<f64>(data.clone());
@@ -75,7 +75,7 @@ impl Task {
         let p50 = percentile::<f64>(&mut data.clone(), 50.0);
         let p90 = percentile::<f64>(&mut data.clone(), 90.0);
         let p99 = percentile::<f64>(&mut data, 99.0);
-        KappaStatistics {
+        TaskStatistics {
             timestamp: timestamp.timestamp_millis() as f64 * 1e-3,
             mean,
             max,
@@ -90,7 +90,7 @@ impl Task {
 
 pub struct TaskManager {
     tasks: HashMap<&'static str, Task>,
-    thread_statics: HashMap<&'static str, KappaStatistics>,
+    thread_statics: HashMap<&'static str, TaskStatistics>,
     interval_update: f64,
     interval_statistics: usize,
     send_statistics: bool,
@@ -131,7 +131,7 @@ impl TaskManager {
         let name: &'static str = Box::leak(Box::new(name.to_string()));
         let task = Task::new(name, thread_id);
         self.tasks.insert(name, task); 
-        self.thread_statics.insert(name, KappaStatistics {
+        self.thread_statics.insert(name, TaskStatistics {
             timestamp: Utc::now().timestamp_millis() as f64 * 1e-3,
             mean: 0.0,
             max: 0.0,

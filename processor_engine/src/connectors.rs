@@ -3,13 +3,13 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
 use data_model::memory_manager::DataHeader;
 
-pub trait ConnectorTrait {
+pub trait ConnectorTrait: Send {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn get_header(&self) -> &DataHeader;
 }
 
-pub struct Input<T: 'static + Send + Any> {
+pub struct Input<T: 'static + Send + Any + Clone> {
     pub header: DataHeader,
     pub sender: Sender<T>,
     receiver: Receiver<T>,
@@ -17,7 +17,7 @@ pub struct Input<T: 'static + Send + Any> {
 }
 
 impl<T> Input<T> 
-where T: 'static + Send + Any
+where T: 'static + Send + Any + Clone
 {
     pub fn new(name: &'static str) -> Self{
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -42,13 +42,13 @@ where T: 'static + Send + Any
         *self.queue_size.lock().unwrap()
     }
 }
-impl<T: 'static + Send + Any> ConnectorTrait for Input<T> {
+impl<T: 'static + Send + Any + Clone> ConnectorTrait for Input<T> {
     fn as_any(&self) -> &dyn Any {self}
     fn as_any_mut(&mut self) -> &mut dyn Any {self}
     fn get_header(&self) -> &DataHeader {&self.header}
 }
 
-pub struct Output<T: 'static + Send> {
+pub struct Output<T: 'static + Send + Clone> {
     pub header: DataHeader,
     pub senders: Vec<Sender<T>>,
 }
@@ -70,7 +70,7 @@ impl<T: 'static + Send + Any + Clone> Output<T> {
     }
 }
 
-impl<T: 'static + Send + Any> ConnectorTrait for Output<T> {
+impl<T: 'static + Send + Any + Clone> ConnectorTrait for Output<T> {
     fn as_any(&self) -> &dyn Any {self}
     fn as_any_mut(&mut self) -> &mut dyn Any {self}
     fn get_header(&self) -> &DataHeader {&self.header}

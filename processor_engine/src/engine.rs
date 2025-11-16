@@ -4,7 +4,7 @@ use data_model::streaming_data::StreamingError;
 
 use crate::stream_processor::StreamProcessor;
 
-pub struct KappaStatistics {
+pub struct TaskStatistics {
     pub timestamp: f64,
     pub mean: f64,
     pub max: f64,
