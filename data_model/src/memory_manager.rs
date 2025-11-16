@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::any::Any;
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::fmt::Display;
 
 use memory_var_macro::MemoryVarMacro;
@@ -24,7 +24,7 @@ pub trait StaticsTrait : Send + Sync + DataTrait {
     fn is_settable(&self) -> bool;
 }
 
-#[derive(MemoryVarMacro)]
+#[derive(MemoryVarMacro, Clone)]
 pub struct Statics<T: 'static + Sync + Send + Display> {
     pub header: DataHeader,
     value: T,
@@ -36,27 +36,35 @@ impl<T> Statics<T>
 where T: 'static + Sync + Send + Copy + PartialOrd + PartialEq + Display
 {
     pub fn new(name: &'static str, value: T) -> Self {
-        MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_state::<T>(name, value);
-        Self {
+        let mm= MemoryManager::get_memory_manager();
+        let res = Self {
             header: DataHeader{name},
             value,
             settable: true,
             lock: Arc::new(Mutex::new(())),
+        };
+        match mm {
+            Ok(mut mgr) => {
+                mgr.register_statics(name, Box::new(res.clone()));
+            }
+            Err(_) => {}
         }
+        res
     }
     pub fn set_value(&mut self, value: T) -> Result<(), StreamingError> {
         let _locked = self.lock.lock().unwrap();
         if self.settable {
             self.value = value;
-            MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_state::<T>(self.header.name, self.get_value());
+            let mm= MemoryManager::get_memory_manager();
+            match mm {
+                Ok(mut mgr) => {
+                    mgr.register_statics(self.header.name, Box::new(self.clone()));
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+            self.settable = false;
             Ok(())
         } else {
             Err(StreamingError::InvalidOperation)
@@ -86,26 +94,34 @@ pub struct State<T: 'static +Send + Sync + Display> {
 impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + PartialEq + Display
 {
     pub fn new(name: &'static str, value: T) -> Self {
-        MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_state::<T>(name, value);
-        Self {
+        let mm= MemoryManager::get_memory_manager();
+        let res = Self {
             header: DataHeader{name},
             value,
             senders: Vec::new(),
             lock: Arc::new(Mutex::new(())),
+        };
+        match mm {
+            Ok(mut mgr) => {
+                mgr.register_state(name, Box::new(res.clone()));
+            }
+            Err(_) => {}
         }
+        res
     }
-    pub fn set_value(& mut self, value: T) {
+    pub fn set_value(& mut self, value: T) -> Result<(), StreamingError> {
         let _locked = self.lock.lock().unwrap();
         self.value = value;
-        MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_state::<T>(self.header.name, self.get_value());
+        let mm= MemoryManager::get_memory_manager();
+        match mm {
+            Ok(mut mgr) => {
+                mgr.register_state(self.header.name, Box::new(self.clone()));
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        Ok(())
     }
     pub fn get_value(&self) -> T {
         let _locked = self.lock.lock().unwrap();
@@ -132,7 +148,7 @@ impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Copy + Displ
 }
 
 #[derive(MemoryVarMacro)]
-pub struct Parameter<T: 'static + Send + Sync + Copy + Clone + Display> {
+pub struct Parameter<T:'static + Send + Sync + Copy + Clone + Display> {
     pub header: DataHeader,
     pub value: T,
     pub default: T,
@@ -140,21 +156,24 @@ pub struct Parameter<T: 'static + Send + Sync + Copy + Clone + Display> {
     lock: Arc<Mutex<()>>,
 }
 
-impl<T> Parameter<T> where T: 'static + Send + Sync + Copy + Clone + PartialOrd + Display{
+impl<T> Parameter<T> where T:'static +  Send + Sync + Copy + Clone + PartialOrd + Display{
     pub fn new(name: &'static str, value: T, limits: Option<[T; 2]>) -> Self {
         let default = value.clone();
-        MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_parameters::<T>(name, value.clone());
-        Self {
+        let res = Self {
             header: DataHeader{name},
             value: value,
             default: default,
             limits: limits,
             lock: Arc::new(Mutex::new(())),
+        };
+        let mm= MemoryManager::get_memory_manager();
+        match mm {
+            Ok(mut mgr) => {
+                mgr.register_parameters(name, Box::new(res.clone()));
+            }
+            Err(_) => {}
         }
+        res
     }
 
     pub fn get_value(&self) -> T {
@@ -162,7 +181,7 @@ impl<T> Parameter<T> where T: 'static + Send + Sync + Copy + Clone + PartialOrd 
         self.value.clone()
 
     }
-    pub fn set_value(&'static mut self, value: T) -> Result<(), StreamingError> {
+    pub fn set_value(&mut self, value: T) -> Result<(), StreamingError> {
         if let Some(limits) = &self.limits {
             if value < limits[0] || value > limits[1] {
                 return Err(StreamingError::OutOfRange);
@@ -170,16 +189,20 @@ impl<T> Parameter<T> where T: 'static + Send + Sync + Copy + Clone + PartialOrd 
         }
         let _locked = self.lock.lock().unwrap();
         self.value = value;
-        MEMORY_MANAGER.get()
-                    .expect("")
-                    .lock()
-                    .unwrap()
-                    .register_parameters::<T>(self.header.name, self.get_value());
+        let mm= MemoryManager::get_memory_manager();
+        match mm {
+            Ok(mut mgr) => {
+                mgr.register_parameters(self.header.name, Box::new(self.clone()));
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
         Ok(())
     }
 }
 
-impl<T> Clone for Parameter<T> where T: 'static + Send + Sync + Copy + Clone + Display {
+impl<T> Clone for Parameter<T> where T: Send + Sync + Copy + Clone + Display {
     fn clone(&self) -> Self {
         Self {
             header: DataHeader{name: self.header.name},
@@ -204,38 +227,115 @@ impl MemoryManager {
             mapped_parameters: HashMap::new(),
         }
     }
-    pub fn get() -> &'static Mutex<MemoryManager> {
+    fn get_instance() -> &'static Mutex<MemoryManager> {
         MEMORY_MANAGER.get_or_init( || Mutex::new(MemoryManager::new()))
     }
-    pub fn register_state<T: 'static + Send + Sync + Copy + Clone + PartialOrd + PartialEq + Display>(&mut self, key: &'static str, value: T  ) {
-        self.mapped_state.insert(key, Box::new(State::<T>::new(key, value)));
+    pub fn get_memory_manager() -> Result<MutexGuard<'static, MemoryManager>, StreamingError> {
+        let memory_mutex = MemoryManager::get_instance();
+        let manager = memory_mutex.lock();
+        match manager {
+            Ok(mgr) => {
+                Ok(mgr)
+            }
+            Err(_) => {
+                Err(StreamingError::InvalidOperation)
+            }
+        }
     }
-    pub fn register_statics<T: 'static + Send + Sync + Copy + Clone + PartialOrd + PartialEq + Display>(&mut self, key: &'static str, value: T) {
-        self.mapped_statics.insert(key, Box::new(Statics::<T>::new(key, value)));
+    pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) {
+        self.mapped_state.insert(key, state);
     }
-    pub fn register_parameters<T: 'static + Send + Sync + Copy + Clone + PartialOrd + PartialEq + Display>(&mut self, key: &'static str, value: T) {
-        self.mapped_parameters.insert(key, Box::new(Parameter::<T>::new(key, value, None)));
+    pub fn register_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) {
+        self.mapped_statics.insert(key, statics);
+    }
+    pub fn register_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) {
+        self.mapped_parameters.insert(key, param);
     }
     pub fn serialize_all(&self) -> String {
         let mut result = String::new();
-        result.push_str("{\n\"  state\": {\n");
+        result.push_str("{\"memory_mapped\":");
+        result.push_str("{\"state\": {");
         for (_, val) in &self.mapped_state {
-            result.push_str(&format!("    {}\n", val.serialize()));
+            result.push_str(&format!("{}", val.serialize()));
         }
-        result.push_str("}\n");
-        result.push_str("{\n\"  statics\": {\n");
+
+        result.push_str("}");
+        result.push_str(",{\"statics\": {");
         for (_, val) in &self.mapped_statics {
-            result.push_str(&format!("    {}\n", val.serialize()));
+            result.push_str(&format!("{}", val.serialize()));
         }
-        result.push_str("}\n");
-        result.push_str("{\n\"  parameters\": {\n");
+        result.push_str("}");
+        result.push_str(",{\"parameters\": {");
         for (_, val) in &self.mapped_parameters {
-            result.push_str(&format!("    {}\n", val.serialize()));
+            result.push_str(&format!("{}", val.serialize()));
         }
-        result.push_str("}\n");
+        result.push_str("}}");
         result
         
     }
 }
 
 static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_manager() {
+        match MemoryManager::get_memory_manager() {
+            Ok(_) => {
+                assert!(true);
+            }
+            Err(_) => panic!("Failed to lock MemoryManager"),
+        };
+    }
+    #[test]
+    fn test_static_variable() {
+        let mut statics = Statics::new("test_statics", 10);
+        assert_eq!(statics.get_value(), 10);
+        statics.set_value(20).unwrap();
+        assert_eq!(statics.get_value(), 20);
+        let result = statics.set_value(30);
+        assert!(result.is_err());
+    }
+    #[test]
+    fn test_state_variable() {
+        let mut state = State::new("test_state", 10);
+        assert_eq!(state.get_value(), 10);
+        state.set_value(20).unwrap();
+        assert_eq!(state.get_value(), 20);
+        let result = state.set_value(30);
+        assert!(result.is_ok());
+    }
+    #[test]
+    fn test_parameter_variable() {
+        let mut param = Parameter::new("test_param", 10, Some([10, 20]));
+        assert_eq!(param.get_value(), 10);
+        param.set_value(20).unwrap();
+        assert_eq!(param.get_value(), 20);
+        let result = param.set_value(30);
+        assert!(result.is_err());
+        assert_eq!(param.get_value(), 20);
+    }
+    #[test]
+    fn test_memory_manager_serialization() {
+        use std::io::Write;
+        use std::fs;
+        use std::path::Path;
+
+        let _ = Statics::new("test_statics_reg", 10);
+        let _ = State::new("test_state_reg", 20);
+        let _ = Parameter::new("test_param_reg", 15, Some([10, 20]));
+        let mm = MemoryManager::get_memory_manager().unwrap();
+        let serialized = mm.serialize_all();
+        assert!(serialized.contains("\"test_statics_reg\""));
+        assert!(serialized.contains("\"test_state_reg\""));
+        assert!(serialized.contains("\"test_param_reg\""));
+        let path = Path::new("test_memory_manager_serialization.json");
+        let mut file = fs::File::create(&path).unwrap();
+        file.write_all(serialized.as_bytes()).unwrap();
+        let json_result = serde_json::from_str::<serde_json::Value>(&serialized);
+        //assert!(json_result.is_ok());
+    }
+}

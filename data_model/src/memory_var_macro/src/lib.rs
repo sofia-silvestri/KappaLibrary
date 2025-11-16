@@ -48,8 +48,8 @@ pub fn connector_macro_derive(input: TokenStream) -> TokenStream {
             fn get_header(&self) -> &DataHeader {&self.header}
             fn serialize(&self) -> String {
                 let mut result = String::new();
-                result.push_str(&format!("\"name\" : \"{}\",\n", self.header.name));
-                result.push_str(&format!("\"value\" : \"{}\"\n", self.value));
+                result.push_str(&format!("\"name\" : \"{}\",", self.header.name));
+                result.push_str(&format!("\"value\" : \"{}\"}}", self.value));
                 result
             }
         }

@@ -4,7 +4,6 @@ members = [
     "processor_engine",
     "data_model/src/memory_var_macro",
     "processor_engine/src/stream_proc_macro",
-    "logger",
     "digital_filters",
     "digital_transform",
     "utils",

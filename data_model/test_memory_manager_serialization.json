@@ -1,0 +1,1 @@
+{"memory_mapped":{"state": {"name" : "test_state_reg","value" : "20"}},{"statics": {"name" : "test_statics_reg","value" : "10"}},{"parameters": {"name" : "test_param","value" : "20"}"name" : "test_param_reg","value" : "15"}}}
