@@ -1,30 +1,39 @@
 use num_traits::Float;
 use std::iter::{Sum,Product};
 use std::convert::From;
-pub trait StatisticsTrait : Float + Sum + From<f64> + Ord + Copy + Product{}
 
-pub fn mean<T: StatisticsTrait>(data: Vec<T>) -> T {
+pub fn mean<T>(data: Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let sum: T = data.iter().cloned().sum();
     sum / (data.len() as f64).into()
 }
 
-pub fn harmonic_mean<T: StatisticsTrait>(data: Vec<T>) -> T {
+pub fn harmonic_mean<T>(data: Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let n : T = (data.len() as f64).into();
     let sum_reciprocal: T = data.iter().map(|&x| T::one() / x).sum();
     n / sum_reciprocal
 }
 
-pub fn square_mean<T: StatisticsTrait>(data: Vec<T>) -> T {
+pub fn square_mean<T>(data: Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let sum_squares: T = data.iter().map(|&x| x * x).sum();
     sum_squares / (data.len() as f64).into()
 }
 
-pub fn geometric_mean<T: StatisticsTrait>(data: Vec<T>) -> T {
+pub fn geometric_mean<T>(data: Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let product: T = data.iter().cloned().product();
     product.powf((1.0 / (data.len() as f64)).into())
 }
 
-pub fn variance<T: StatisticsTrait>(data: Vec<T>, mean: T) -> T {
+pub fn variance<T>(data: Vec<T>, mean: T) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let var_sum: T = data.iter().map(|&x| {
         let diff = x - mean;
         diff * diff
@@ -32,11 +41,15 @@ pub fn variance<T: StatisticsTrait>(data: Vec<T>, mean: T) -> T {
     var_sum / (data.len() as f64).into()
 }
 
-pub fn std_deviation<T: StatisticsTrait>(data: Vec<T>, mean: T) -> T {
+pub fn std_deviation<T>(data: Vec<T>, mean: T) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     variance(data, mean).sqrt()
 }
 
-pub fn covariance<T: StatisticsTrait>(data_x: Vec<T>, data_y: Vec<T>) -> T {
+pub fn covariance<T>(data_x: Vec<T>, data_y: Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
     let mean_x = mean(data_x.clone());
     let mean_y = mean(data_y.clone());
     let cov_sum: T = data_x.iter().zip(data_y.iter()).map(|(&x, &y)| {
@@ -45,8 +58,11 @@ pub fn covariance<T: StatisticsTrait>(data_x: Vec<T>, data_y: Vec<T>) -> T {
     cov_sum / (data_x.len() as f64).into()
 }
 
-pub fn median<T: StatisticsTrait>(data: &mut Vec<T>) -> T {
-    data.sort();
+pub fn median<T>(data: &mut Vec<T>) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
+    data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
     let len = data.len();
     if len % 2 == 0 {
         let mid1 = data[len / 2 - 1];
@@ -57,8 +73,11 @@ pub fn median<T: StatisticsTrait>(data: &mut Vec<T>) -> T {
     }
 }
 
-pub fn percentile<T: StatisticsTrait>(data: &mut Vec<T>, percentile: f64) -> T {
-    data.sort();
+pub fn percentile<T>(data: &mut Vec<T>, percentile: f64) -> T 
+where T: Float + Sum + From<f64> + PartialOrd + Copy + Product
+{
+    data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
     let k = (percentile / 100.0) * ((data.len() - 1) as f64);
     let f = k.floor() as usize;
     let c = k.ceil() as usize;
