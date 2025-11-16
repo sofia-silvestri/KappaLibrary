@@ -1,115 +1,62 @@
-use std::collections::HashMap;
+use core::task;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::fmt;
 use chrono::{DateTime, Utc};
-use data_model::streaming_error::StreamingError;
+use data_model::streaming_data::StreamingError;
 use libc::{clock_gettime, clockid_t, pthread_getcpuclockid, pthread_self, pthread_t, timespec};
+use utils::math::statistics::{mean, std_deviation, percentile};
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct Task {
-    pub name: &'static str,
-    thread_id: pthread_t,
-    cpu_clock_id: clockid_t,
-    last_cpu_time: f64,
-    last_update: DateTime<Utc>
+use crate::stream_processor::{StreamBlockDyn, StreamProcessor};
+
+pub struct KappaStatistics {
+    pub timestamp: f64,
+    pub mean: f64,
+    pub max: f64,
+    pub min: f64,
+    pub std_dev: f64,
+    pub p50: f64,
+    pub p90: f64,
+    pub p99: f64,
 }
 
-impl Task {
-    pub fn new(name: &'static str, thread_id: pthread_t) -> Self {
-        
-        let mut cpu_clock_id: clockid_t = 0;
-        unsafe {
-            pthread_getcpuclockid(thread_id, &mut cpu_clock_id);
-        }
-        Task {
-            name,
-            thread_id,
-            cpu_clock_id,
-            last_cpu_time: 0.0,
-            last_update: Utc::now(),
-        }
-    }
-    pub fn update(&mut self) -> Result<f64, StreamingError> {
-        let mut occupacy: f64 = 0.0;
-        unsafe {
-            let mut ts: timespec = timespec { tv_sec: 0, tv_nsec: 0 };
-            let ts_ptr: *mut timespec = &mut ts as *mut timespec;
-            if clock_gettime(self.cpu_clock_id, ts_ptr) != 0 {
-                return Err(StreamingError::TaskError);
-            }
-            if self.last_cpu_time == 0.0 {
-                self.last_cpu_time = utils::time::timespec_to_f64(&ts);
-                self.last_update = Utc::now();
-            } else {
-                let current_cpu_time = utils::time::timespec_to_f64(&ts);
-                let current_time = Utc::now();
-                let cpu_time_diff = current_cpu_time - self.last_cpu_time;
-                let wall_time_diff = (current_time - self.last_update).num_nanoseconds().unwrap() as f64 * 1e-9;
-                if wall_time_diff > 0.0 {
-                    occupacy = cpu_time_diff / wall_time_diff;
-                }
-                self.last_cpu_time = current_cpu_time;
-                self.last_update = current_time;
-            }
-        }
-        Ok(occupacy)
-    }
+pub struct ProcessorEngine {
+    processor_map: HashMap<&'static str, &'static Box<dyn StreamProcessor>>,
 }
 
-pub struct TaskManager {
-    tasks: HashMap<&'static str, Task>,
-    thread_occupacy: HashMap<&'static str, f64>
-    interval_secs: f64,
-}
-
-impl TaskManager {
+impl ProcessorEngine {
     fn new() -> Self {
-        TaskManager {
-            tasks: HashMap::new(),
-            thread_occupacy: HashMap::new(),
-            interval_secs: 0.1,
+        Self { processor_map: HashMap::new() }
+    }
+    pub fn get() -> &'static Mutex<ProcessorEngine> {
+        PROCESSOR_ENGINE.get_or_init(|| Mutex::new(ProcessorEngine::new()))
+    }
+    pub fn register_processor(&mut self, name: &'static str, processor: &'static Box<dyn StreamProcessor>) -> Result<(), StreamingError> {
+        if let Some(_) = self.processor_map.insert(name, processor) {
+            Ok(())
+        } else {
+            Err(StreamingError::AlreadyDefined)
         }
     }
-    pub fn get() -> &'static Mutex<TaskManager> {
-        TASK_MANAGER.get_or_init(|| Mutex::new(TaskManager::new()))
-    }
-    pub fn set_time_update(&mut self, interval_secs: f64) {
-        self.interval_secs = interval_secs;
-    }
-    pub fn create_task<F, T, S: Copy>(&mut self, name: S, f: F) -> std::io::Result<JoinHandle<T>>
-    where
-        F: FnOnce() -> T + Send + 'static, 
-        T: Send + 'static, 
-        S: Into<String> + fmt::Display, 
-    {
-        let builder = thread::Builder::new().name(name.into());  
-        let thread_id = unsafe { pthread_self() };
-        let name: &'static str = Box::leak(Box::new(name.to_string()));
-        let task = Task::new(name, thread_id);
-        self.tasks.insert(name, task);
-        self.thread_occupacy.insert(name, 0.0);
-        builder.spawn(f)
-    }
-    pub fn start_task_monitoring(&self, ) {
-        thread::spawn(move || {
-            loop {
-                let task_manager = TaskManager::get();
-                thread::sleep(std::time::Duration::from_secs_f64(task_manager.lock().unwrap().interval_secs));
-                for (name, task) in task_manager.lock().unwrap().tasks.iter_mut() {
-                    match task.update() {
-                        Ok(occupacy) => {
-                            task_manager.lock().unwrap().thread_occupacy.insert(&name, occupacy);
-                        }
-                        Err(e) => {
-                            eprintln!("Error updating task '{}': {}", name, e);
-                        }
-                    }
+    pub fn init(&mut self) -> Result<(), StreamingError>{
+        for (_, value) in self.processor_map.iter_mut() {
+            match value.init() {
+                Ok(_) => {}
+                Err(e) => {
+                    let _ = self.stop();
+                    return Err(e);
                 }
             }
-        });
+        }
+        Ok(())
+    }
+    pub fn stop(&mut self) -> Result<(), StreamingError>{
+        for (_, value) in self.processor_map.iter_mut() {
+            value.stop()?;
+        }
+        Ok(())
     }
 }
 
-static TASK_MANAGER: OnceLock<Mutex<TaskManager>> = OnceLock::new();
+static PROCESSOR_ENGINE: OnceLock<Mutex<ProcessorEngine>> = OnceLock::new();

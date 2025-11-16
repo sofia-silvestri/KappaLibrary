@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::fmt::Display;
 
 use memory_var_macro::MemoryVarMacro;
-use crate::streaming_error::{StreamingState, StreamingError};
+use crate::streaming_data::StreamingError;
 
 // General traits for Statics, States and Parameters
 #[derive(Debug, Clone, Copy)]

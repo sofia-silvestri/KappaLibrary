@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::connectors::{Input, Output};
 use data_model::memory_manager::Statics;
 use data_model::memory_manager::Parameter;
-use data_model::streaming_error::{StreamingError, StreamingState};
+use data_model::streaming_data::{StreamingError, StreamingState};
 
 use serde::Serialize;
 
@@ -70,9 +70,6 @@ pub trait StreamProcessor: StreamBlockDyn {
         Ok(())
     }
     fn stop(&mut self) -> Result<(), StreamingError > {
-        if self.check_state(StreamingState::Initial ){
-            return Err(StreamingError::InvalidStateTransition);
-        }
         self.set_state(StreamingState::Stopped);
         Ok(())
     }

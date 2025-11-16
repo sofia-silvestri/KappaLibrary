@@ -1,8 +1,7 @@
-use std::any::{Any,TypeId};
+use std::any::Any;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
-use memory_var_macro::MemoryVarMacro;
 use data_model::memory_manager::DataHeader;
-use data_model::memory_manager::DataTrait;
 
 pub trait ConnectorTrait {
     fn as_any(&self) -> &dyn Any;
@@ -14,6 +13,7 @@ pub struct Input<T: 'static + Send + Any> {
     pub header: DataHeader,
     pub sender: Sender<T>,
     receiver: Receiver<T>,
+    queue_size: Arc<Mutex<usize>>,
 }
 
 impl<T> Input<T> 
@@ -25,13 +25,21 @@ where T: 'static + Send + Any
             header: DataHeader{name},
             sender,
             receiver,
+            queue_size: Arc::new(Mutex::new(0)),
         }
     }
-    pub fn send(&self, data: T) {
+    pub fn send(&mut self, data: T) {
         self.sender.send(data).unwrap();
+        let queue_size = *self.queue_size.lock().unwrap();
+        *self.queue_size.lock().unwrap() = queue_size+1;
     }
-    pub fn recv(&self) -> T {
+    pub fn recv(&mut self) -> T {
+        let queue_size = *self.queue_size.lock().unwrap();
+        *self.queue_size.lock().unwrap() = queue_size-1;
         self.receiver.recv().unwrap()
+    }
+    pub fn get_queue_size(&self) -> usize {
+        *self.queue_size.lock().unwrap()
     }
 }
 impl<T: 'static + Send + Any> ConnectorTrait for Input<T> {

@@ -1,4 +1,18 @@
 #[derive(Debug, PartialEq)]
+
+#[repr(C)]
+pub struct KappaStatistics {
+    pub timestamp: f64,
+    pub mean: f64,
+    pub max: f64,
+    pub min: f64,
+    pub std_dev: f64,
+    pub p50: f64,
+    pub p90: f64,
+    pub p99: f64,
+}
+
+#[derive(Debug)]
 pub enum StreamingState {
     Null,
     Initial,
@@ -15,6 +29,7 @@ impl std::fmt::Display for StreamingState {
 #[derive(Debug)]
 pub enum StreamingError {
     Ok,
+    AlreadyDefined,
     InvalidStateTransition,
     InvalidParameter,
     InvalidInput,
