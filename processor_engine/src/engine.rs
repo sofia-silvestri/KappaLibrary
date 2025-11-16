@@ -1,14 +1,8 @@
-use core::task;
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex, OnceLock};
-use std::thread::{self, JoinHandle};
-use std::fmt;
-use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use data_model::streaming_data::StreamingError;
-use libc::{clock_gettime, clockid_t, pthread_getcpuclockid, pthread_self, pthread_t, timespec};
-use utils::math::statistics::{mean, std_deviation, percentile};
 
-use crate::stream_processor::{StreamBlockDyn, StreamProcessor};
+use crate::stream_processor::StreamProcessor;
 
 pub struct KappaStatistics {
     pub timestamp: f64,
@@ -22,7 +16,7 @@ pub struct KappaStatistics {
 }
 
 pub struct ProcessorEngine {
-    processor_map: HashMap<&'static str, &'static Box<dyn StreamProcessor>>,
+    processor_map: HashMap<&'static str, Box<dyn StreamProcessor>>,
 }
 
 impl ProcessorEngine {
@@ -32,7 +26,7 @@ impl ProcessorEngine {
     pub fn get() -> &'static Mutex<ProcessorEngine> {
         PROCESSOR_ENGINE.get_or_init(|| Mutex::new(ProcessorEngine::new()))
     }
-    pub fn register_processor(&mut self, name: &'static str, processor: &'static Box<dyn StreamProcessor>) -> Result<(), StreamingError> {
+    pub fn register_processor(&mut self, name: &'static str, processor: Box<dyn StreamProcessor>) -> Result<(), StreamingError> {
         if let Some(_) = self.processor_map.insert(name, processor) {
             Ok(())
         } else {
@@ -41,7 +35,7 @@ impl ProcessorEngine {
     }
     pub fn init(&mut self) -> Result<(), StreamingError>{
         for (_, value) in self.processor_map.iter_mut() {
-            match value.init() {
+            match value.as_mut().init() {
                 Ok(_) => {}
                 Err(e) => {
                     let _ = self.stop();
