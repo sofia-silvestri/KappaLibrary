@@ -1,41 +1,32 @@
-use std::fmt::{Debug, Display};
 use std::collections::HashMap;
-use std::ffi::c_char;
-use std::sync::{mpsc::Sender, Mutex};
 use std::any::Any;
+use std::fmt::{Display, Debug};
+use std::sync::mpsc::SyncSender;
+use std::sync::{Arc, Mutex};
 use num_traits::{Float, Zero};
 use serde::Serialize;
+use stream_proc_macro::{StreamBlockMacro};
+use data_model::streaming_data::{StreamingError, StreamingState};
+use data_model::memory_manager::{DataTrait, MemoryManager, Parameter, State, Statics, StaticsTrait};
 use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
-use processor_engine::stream_processor::{StreamProcessorStruct, StreamingState};
-use processor_engine::connectors::{Input, Output, Parameter};
-use processor_engine::connectors::ConnectorsTrait;
-use stream_proc_macro::StreamBlockMacro;
-
-use data_model::memory_manager::{StaticsTrait, Statics};
-use data_model::streaming_error::StreamingError;
+use processor_engine::connectors::{ConnectorTrait, Input, Output};
+use processor_engine::engine::ProcessorEngine;
 use utils::math::{numbers::factorize, complex::Complex};
 
 
-#[unsafe(no_mangle)]
-pub static FFT_PROCESS: StreamProcessorStruct = StreamProcessorStruct {
-    name: b"Fast Fourier Transform\0".as_ptr() as *const c_char,
-    description: b"Fast Fourier Transform Process Block\0".as_ptr() as *const c_char,
-    input_number: 2,
-    inputs: &[b"real_input\0".as_ptr() as *const c_char, b"complex_input\0".as_ptr() as *const c_char],
-    inputs_type: &[b"Vec<V>, Vec<Complex<T>>\0".as_ptr() as *const c_char],
-    output_number: 1,
-    outputs: &[b"output\0".as_ptr() as *const c_char],
-    outputs_type: &[b"Vec<Complex<T>>\0".as_ptr() as *const c_char],
-    parameter_number: 1,
-    parameters: &[b"fft_type_input\0".as_ptr() as *const c_char],
-    parameters_type: &[b"FftInputType\0".as_ptr() as *const c_char],
-};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Copy, Serialize)]
 pub enum FftInputType {
     Real,
     Complex,
 }
+
+impl Display for FftInputType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 unsafe impl Send for FftInputType {}
 pub struct Fft<T> {
     size: usize,
@@ -45,7 +36,7 @@ pub struct Fft<T> {
 
 impl<T> Fft<T>
 where
-    T: Into<f64> + From<f64> + Copy + Zero + Float + Debug + Display,
+    T: Into<f64> + From<f64> + Copy + Zero + Float + Display + Debug,
 {
     pub fn new(inverse: bool, size: usize) -> Self {
         let mut weights: Vec<Complex<T>> = Vec::with_capacity(size);
@@ -75,7 +66,7 @@ where
         start: usize,
         step: usize) -> Vec<Complex<T>>
     where
-        T: Debug + Display + Float,
+        T: Display + Float,
     {
         if size == 1 {
             return input.clone();
@@ -112,7 +103,7 @@ where
 
     pub fn fft_real(&self, input: &Vec<T>) -> Vec<Complex<T>>
     where
-        T: Into<T> + Copy + Float + Debug + Display,
+        T: Into<T> + Copy + Float + Display,
     {
         let mut input: Vec<Complex<T>> = input.iter().map(|&x| Complex::new(x, T::zero())).collect();
         if input.len() < self.size {
@@ -139,12 +130,13 @@ where
 
 #[derive(StreamBlockMacro)]
 pub struct FftProcess<T: 'static + Send + Clone> {
-    inputs:      HashMap<&'static str, Box<dyn ConnectorsTrait>>,
-    outputs:     HashMap<&'static str, Box<dyn ConnectorsTrait>>,
-    parameters:  HashMap<&'static str, Box<dyn ConnectorsTrait>>,
+    inputs:      HashMap<&'static str, Box<dyn ConnectorTrait>>,
+    outputs:     HashMap<&'static str, Box<dyn ConnectorTrait>>,
+    parameters:  HashMap<&'static str, Box<dyn DataTrait>>,
     statics:     HashMap<&'static str, Box<dyn StaticsTrait>>,
-    module_name: Statics<&'static str>,
-    state:       Mutex<StreamingState>,
+    state:       HashMap<&'static str, Box<dyn StaticsTrait>>,
+    name:        &'static str,
+    proc_state:  Mutex<StreamingState>,
     lock:        Mutex<()>,
     fft_planner: Fft<T>,
 }
@@ -157,37 +149,28 @@ where
     + Into<f64> 
     + From<f64>
     + Float
-    + Debug
-    + Display,
+    + Display
+    + Debug,
 {
     pub fn new(name: &'static str) -> Self {
         let fft_planner = Fft::<T>::new(false, 2);
-        let inputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        let outputs: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        let parameters: HashMap<&'static str, Box<dyn ConnectorsTrait>> = HashMap::new();
-        let statics: HashMap<&'static str, Box<dyn StaticsTrait>> = HashMap::new();
-        let module_name: &'static str = Box::leak(format!("{}.{}", "FftProcess", name).into_boxed_str());
-        
         let mut ret= Self {
-            inputs,
-            outputs,
-            parameters,
-            statics,
-            module_name: Statics::new("FftProcess", "module_name"),
-            state: Mutex::new(StreamingState::Null),
+            inputs: HashMap::new(),
+            outputs: HashMap::new(),
+            parameters: HashMap::new(),
+            statics: HashMap::new(),
+            state: HashMap::new(),
+            name: name,
+            proc_state: Mutex::new(StreamingState::Null),
             lock: Mutex::new(()),
             fft_planner,
         };
-        ret.new_input::<Vec<Complex<T>>>("complex_input", "Complex input Signal").unwrap();
-        ret.new_input::<Vec<T>>("real_input", "Real input Signal").unwrap();
-        ret.new_output::<Vec<Complex<T>>>("output", "Output Complex Signal").unwrap();
-        ret.new_parameter::<FftInputType>("fft_type_input", "FFT Input Type", FftInputType::Real).unwrap();
-        ret.new_statics::<u32>("fft_size", "FFT Size", 2).unwrap();
-        ret.new_statics::<bool>("inverse", "Inverse FFT", false).unwrap();
-        match ret.module_name.set(module_name) {
-            Ok(_) => {},
-            Err(e) => {panic!("Failed to set module name statics: {}", e);}
-        }
+        ret.new_input::<Vec<Complex<T>>>("complex_input").unwrap();
+        ret.new_input::<Vec<T>>("real_input").unwrap();
+        ret.new_output::<Vec<Complex<T>>>("output").unwrap();
+        ret.new_parameter::<FftInputType>("fft_type_input", FftInputType::Real, None).unwrap();
+        ret.new_statics::<u32>("fft_size", 2).unwrap();
+        ret.new_statics::<bool>("inverse", false).unwrap();
         ret
     }
 }
@@ -200,35 +183,20 @@ where
         + Into<f64> 
         + From<f64>
         + Float
-        + Debug
-        + Display,
+        + Display
+        + Debug,
 {
     fn init(&mut self) -> Result<(), StreamingError > {
         if self.check_state(StreamingState::Running) {
             return Err(StreamingError::InvalidStateTransition)
         }
+        if !self.is_initialized() {
+            return Err(StreamingError::InvalidStatics)
+        }
         if self.check_state(StreamingState::Null) {
-            let mut fft_size: usize = 0;
-            let mut inverse: bool = false;
-            for statics_key in self.statics.keys() {
-                match statics_key {
-                    &"fft_size" => {
-                        let fft_size_statics = self.get_statics::<u32>("fft_size")?;
-                        if fft_size_statics.is_settable() {
-                            return Err(StreamingError::UnsetStatics);
-                        }
-                        fft_size = fft_size_statics.get().clone() as usize;
-                    }
-                    &"inverse" => {
-                        let inverse_statics = self.get_statics::<bool>("inverse")?;
-                        if inverse_statics.is_settable() {
-                            return Err(StreamingError::UnsetStatics);
-                        }
-                        inverse = inverse_statics.get().clone();
-                    }
-                    _ => {}
-                }
-            }
+            let fft_size: usize = self.get_statics::<u32>("fft_size").expect("").get_value().clone() as usize;
+            let inverse: bool = self.get_statics::<bool>("inverse").expect("").get_value().clone();
+            
             self.fft_planner = Fft::<T>::new(inverse, fft_size);
         }
         self.set_state(StreamingState::Initial);
@@ -237,16 +205,15 @@ where
     }
     fn process(&mut self) -> Result<(), StreamingError> {
         let fft_input = self.get_parameter::<FftInputType>("fft_type_input").expect("").get_value().clone();
-        let _guard = self.lock.lock().unwrap();
         let fft_result: Vec<Complex<T>>;
         if fft_input == FftInputType::Real {
-            let input_real = self.get_input::<Vec::<T>>("real_input").expect("").recv();
-            let _guard = self.state.lock().unwrap();
-            fft_result = self.fft_planner.fft_real(&input_real);
+            let input_real = self.recv_input::<Vec::<T>>("real_input");
+            let _guard = self.proc_state.lock().unwrap();
+            fft_result = self.fft_planner.fft_real(input_real.unwrap().as_ref());
         } else {
-            let input_complex = self.get_input::<Vec::<Complex::<T>>>("input").expect("").recv();
-            let _guard = self.state.lock().unwrap();
-            fft_result = self.fft_planner.fft_complex(&input_complex);
+            let input_complex = self.recv_input::<Vec::<Complex::<T>>>("input");
+            let _guard = self.proc_state.lock().unwrap();
+            fft_result = self.fft_planner.fft_complex(input_complex.unwrap().as_ref());
         }
         self.get_output("output").unwrap().send(fft_result);
         Ok(())
