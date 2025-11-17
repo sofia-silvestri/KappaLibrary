@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::fmt::Display;
 use std::sync::mpsc::SyncSender;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use chrono::prelude::*;
 use serde::Serialize;
 use stream_proc_macro::{StreamBlockMacro};
@@ -66,7 +66,6 @@ pub struct Logger {
     proc_state: Arc<Mutex<StreamingState>>,
     log_time_start: DateTime<Utc>,
     log_file_name: String,
-    log_file:   Option<fs::File>,
 }
 
 impl Logger {
@@ -86,7 +85,6 @@ impl Logger {
             proc_state: Arc::new(Mutex::new(StreamingState::Null)),
             log_time_start: Utc::now(),
             log_file_name: String::new(),
-            log_file: None,
         };
         logger.new_parameter::<&'static str>("log_file_path", "./log", None).unwrap();
         logger.new_parameter::<&'static str>("log_file_prefix", "", None).unwrap();
@@ -120,7 +118,15 @@ impl Logger {
             }
         }
         self.log_file_name = self.get_file_path();
-        self.log_file = Some(fs::File::create(self.log_file_name.as_str())?);
+        let file = fs::File::create(self.log_file_name.as_str());
+        if (file.is_err()) {
+            return Err(file.err().unwrap());
+        }
+        if (LOG_FILE.get().is_some()) {
+            LOG_FILE.get_or_init(|| Mutex::new(file.unwrap()));
+        } else {
+            LOG_FILE.set(Mutex::new(file.unwrap())).unwrap();
+        }
         Ok(())
     }
 
@@ -178,7 +184,6 @@ impl StreamProcessor for Logger {
     }
 
     fn run(&mut self) -> Result<(), StreamingError> {
-        // Implementazione specifica per Logger
         self.start_log_file().map_err(|_| StreamingError::CreateError)?;
         self.set_state(StreamingState::Running);
         self.log_time_start = Utc::now();
@@ -199,16 +204,17 @@ impl StreamProcessor for Logger {
                                                 log_entry.module,
                                                 log_entry.message);
                     let _lock = self.lock.lock().unwrap();
-                    let res = self.log_file.as_mut().unwrap().write_all(log_string.as_bytes());
-                    match res {
-                        Ok(_) => {}
-                        Err(_) => {
-                            error = true;
+                    {
+                        let res = LOG_FILE.get().unwrap().lock().unwrap().write_all(log_string.as_bytes());
+                        match res {
+                            Ok(_) => {}
+                            Err(_) => {
+                                error = true;
+                            }
                         }
                     }
                 }
-                let mut output = self.get_output::<LogEntry>("log_redirect");
-                output.as_mut().unwrap().send(log_entry);
+                let _ = self.send_output::<LogEntry>("log_redirect", log_entry.clone());
                 if error {
                     self.set_state(StreamingState::Stopped);
                     return Err(StreamingError::WriteError);
@@ -264,3 +270,5 @@ mod test {
         output_receiver.recv().unwrap();
     }
 }
+
+static LOG_FILE: OnceLock<Mutex<fs::File>> = OnceLock::new();

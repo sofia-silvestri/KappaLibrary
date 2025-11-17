@@ -35,7 +35,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
     if !fields_names {
         return syn::Error::new_spanned(
             name,
-            "Struct must have 'inputs', 'outputs', 'parameters', 'statics', 'state', 'name' and 'lock' fields to derive MemoryVarTraid.",
+            "Struct must have 'inputs', 'outputs', 'parameters', 'statics', 'state', 'name', 'prooc_state' and 'lock' fields to derive StreamBlockMacro.",
         )
         .to_compile_error()
         .into();
