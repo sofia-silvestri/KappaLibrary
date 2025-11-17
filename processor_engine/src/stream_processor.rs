@@ -90,3 +90,83 @@ pub struct StreamProcessorStruct {
     pub parameters_type: &'static [*const c_char],
 }
 unsafe impl Sync for StreamProcessorStruct {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+    use data_model::memory_manager::{DataTrait, StaticsTrait};
+    use crate::connectors::ConnectorTrait;
+    use stream_proc_macro::StreamBlockMacro;
+    #[derive(StreamBlockMacro)]
+    pub struct TestBlock {
+        name:       &'static str,
+        inputs:     HashMap<&'static str, Box<dyn ConnectorTrait>>,
+        outputs:    HashMap<&'static str, Box<dyn ConnectorTrait>>,
+        parameters: HashMap<&'static str, Box<dyn DataTrait>>,
+        statics:    HashMap<&'static str, Box<dyn StaticsTrait>>,
+        state:      HashMap<&'static str, Box<dyn DataTrait>>,
+        lock:       Arc<Mutex<()>>,
+        proc_state: Arc<Mutex<StreamingState>>,
+    }
+    impl TestBlock {
+        pub fn new(name: &'static str) -> Self {
+            let mut ret = Self {
+                name,
+                inputs: HashMap::new(),
+                outputs: HashMap::new(),
+                parameters: HashMap::new(),
+                statics: HashMap::new(),
+                state: HashMap::new(),
+                lock: Arc::new(Mutex::new(())),
+                proc_state: Arc::new(Mutex::new(StreamingState::Null)),
+            };
+            ret.new_input::<i32>("test_input");
+            ret.new_output::<f32>("test_output");
+            ret.new_parameter::<bool>("change_sign", false, None);
+            ret.new_statics::<i32>("sum_value", 0);
+
+            ret
+        }
+    }
+    impl StreamProcessor for TestBlock {
+        fn process(&mut self) -> Result<(), StreamingError >{
+            let change_sign = self.get_parameter_value::<bool>("change_sign").unwrap();
+            let sum_value = self.get_statics::<i32>("sum_value").unwrap().get_value();
+            let value = self.recv_input::<i32>("test_input").unwrap();
+            let out_value: f32;
+            if !change_sign {
+                out_value = (value + sum_value) as f32;
+            } else {
+                out_value = -(value + sum_value) as f32;
+            }
+            self.send_output::<f32>("test_output", out_value)
+
+        }
+    }
+
+    #[test]
+    fn test_processor() {
+        let mut test_block = TestBlock::new("test");
+        let res = test_block.init();
+        assert!(res.is_err());
+        assert_eq!(res.err(), Some(StreamingError::InvalidStatics));
+        let res = test_block.set_statics_value("sum_value", 5);
+        assert!(res.is_ok());
+        assert!(test_block.init().is_ok());
+        let sender = test_block.get_input::<u32>("test_input").unwrap().sender.clone();
+        let (out_sender, out_receiver) = std::sync::mpsc::sync_channel::<f32>(50);
+        test_block.connect("test_output", out_sender);
+        
+        sender.send(0);
+        test_block.process();
+        assert_eq!(out_receiver.recv().unwrap(), 5.0);
+        sender.send(1);
+        test_block.process();
+        assert_eq!(out_receiver.recv().unwrap(), 6.0);
+        test_block.set_parameter_value("change_sign", true);
+        sender.send(1);
+        assert_eq!(out_receiver.recv().unwrap(), -6.0);
+    }
+}

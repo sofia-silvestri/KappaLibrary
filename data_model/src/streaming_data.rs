@@ -26,7 +26,7 @@ impl std::fmt::Display for StreamingState {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StreamingError {
     Ok,
     GenericError,
