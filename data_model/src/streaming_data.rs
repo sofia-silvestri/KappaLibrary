@@ -29,6 +29,7 @@ impl std::fmt::Display for StreamingState {
 #[derive(Debug)]
 pub enum StreamingError {
     Ok,
+    GenericError,
     AlreadyDefined,
     InvalidStateTransition,
     InvalidParameter,

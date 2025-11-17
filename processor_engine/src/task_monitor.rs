@@ -20,6 +20,9 @@ struct Task {
     
 }
 
+unsafe impl Send for Task {}
+unsafe impl Sync for Task {}
+
 impl Task {
     pub fn new(name: &'static str, thread_id: pthread_t) -> Self {
         
