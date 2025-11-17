@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::ffi::c_char;
 use std::fmt::Display;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::SyncSender;
 use std::thread;
 use std::time::Duration;
 
@@ -21,8 +21,8 @@ pub trait StreamBlock {
     fn get_output<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
     fn get_parameter<T: Send + Sync + Copy + Clone + Display> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
     fn get_statics<T: 'static + Send + Sync + Display> (&self, key: &str) -> Result<&Statics<T>, StreamingError>;
-    fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&Sender<T>, StreamingError>;
-    fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: Sender<T>) -> Result<(), StreamingError>;
+    fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&SyncSender<T>, StreamingError>;
+    fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<T>) -> Result<(), StreamingError>;
     fn get_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync+Display>(&self, key: &str) -> Result<T, StreamingError>;
     fn set_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync+ Display>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
     fn set_statics_value<T: 'static + Send + Clone + Copy + Serialize + Sync + Display + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;

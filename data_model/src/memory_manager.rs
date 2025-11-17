@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::any::Any;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::fmt::Display;
 
@@ -87,7 +87,7 @@ where T: 'static + Sync + Send + Copy + Display
 pub struct State<T: 'static +Send + Sync + Display> {
     pub header: DataHeader,
     value: T,
-    senders: Vec<Sender<T>>,
+    senders: Vec<SyncSender<T>>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -127,7 +127,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + Pa
         let _locked = self.lock.lock().unwrap();
         self.value
     }
-    pub fn connect(&mut self, sender: Sender<T>) {
+    pub fn connect(&mut self, sender: SyncSender<T>) {
         self.senders.push(sender);
     }
     pub fn send(&self) {

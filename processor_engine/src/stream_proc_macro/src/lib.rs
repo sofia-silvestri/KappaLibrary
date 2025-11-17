@@ -161,7 +161,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn get_input_channel<V: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&Sender<V>, StreamingError> {
+            fn get_input_channel<V: 'static + Send + Any + Clone>(&self, key: &str) -> Result<&SyncSender<V>, StreamingError> {
                 if let Some(container) = self.inputs.get(key) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(input_container) = any_ref.downcast_ref::<Input<V>>() {
@@ -173,7 +173,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidInput)
                 }
             }
-            fn connect<V: 'static + Send + Any + Clone>(&mut self, key: &str, sender: Sender<V>) -> Result<(), StreamingError> {
+            fn connect<V: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<V>) -> Result<(), StreamingError> {
                 if let Some(container) = self.outputs.get_mut(key) {
                     let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
                     if let Some(output) = any_mut.downcast_mut::<Output<V>>() {
@@ -226,7 +226,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 if let Some(container) = self.inputs.get_mut(key) {
                     let any_ref : &mut dyn Any = container.as_mut().as_any_mut(); 
                     if let Some(input_container) = any_ref.downcast_mut :: < Input < V >> () { 
-                        Ok(input_container.recv()) 
+                        input_container.recv() 
                     } else { 
                         Err(StreamingError :: WrongType) 
                     }
@@ -238,8 +238,7 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 if let Some(container) = self.outputs.get(key) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(output_container) = any_ref.downcast_ref::<Output<V>>() {
-                        output_container.send(value);
-                        Ok(())
+                        output_container.send(value)
                     } else {
                         Err(StreamingError::WrongType)
                     }

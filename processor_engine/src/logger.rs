@@ -6,7 +6,7 @@ use std::process::Command;
 use std::fs;
 use std::path::Path;
 use std::fmt::Display;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use chrono::prelude::*;
 use serde::Serialize;

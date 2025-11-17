@@ -38,6 +38,8 @@ pub enum StreamingError {
     InvalidStatics,
     InvalidProcessorBlock,
     InvalidOperation,
+    SendDataError,
+    ReceiveDataError,
     UnsetStatics,
     OutOfRange,
     WrongType,
