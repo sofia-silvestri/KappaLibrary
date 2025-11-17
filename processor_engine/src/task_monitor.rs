@@ -6,7 +6,19 @@ use chrono::{DateTime, Utc};
 use data_model::streaming_data::StreamingError;
 use libc::{clock_gettime, clockid_t, pthread_getcpuclockid, pthread_self, pthread_t, timespec};
 use utils::math::statistics::{mean, std_deviation, percentile};
-use data_model::streaming_data::TaskStatistics;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TaskStatistics {
+    pub timestamp: f64,
+    pub mean: f64,
+    pub max: f64,
+    pub min: f64,
+    pub std_dev: f64,
+    pub p50: f64,
+    pub p90: f64,
+    pub p99: f64,
+}
 
 #[repr(C)]
 #[derive(Clone)]
@@ -146,37 +158,70 @@ impl TaskManager {
         });
         builder.spawn(f)
     }
-    pub fn start_task_monitoring(&self, ) {
-        thread::spawn(move || {
-            loop {
-                let task_manager = TaskManager::get();
-                let mut update_statistics = false;
-                thread::sleep(std::time::Duration::from_secs_f64(task_manager.lock().unwrap().interval_update));
-                task_manager.lock().unwrap().count_updates += 1;
-                if (task_manager.lock().unwrap().count_updates % task_manager.lock().unwrap().interval_statistics) == 0 {
-                    update_statistics = true;
-                    task_manager.lock().unwrap().count_updates = 0;
-                }
-                for (name, task) in task_manager.lock().unwrap().tasks.iter_mut() {
-                    match task.update() {
-                        Ok(_) => {
-                            if !update_statistics {
-                                continue;
-                            }
-                            let stats = task.get_stats();
-                            task_manager.lock().unwrap().thread_statics.insert(&name, stats);
-                        }
-                        Err(e) => {
-                            eprintln!("Error updating task '{}': {}", name, e);
-                        }
-                    }
-                }
-                if task_manager.lock().unwrap().send_statistics && update_statistics {
-                    todo!(); // Send statistics to monitoring system
-                }   
-            }
-        });
-    }
 }
 
 static TASK_MANAGER: OnceLock<Mutex<TaskManager>> = OnceLock::new();
+
+pub fn start_task_monitoring() -> JoinHandle<()> {
+    thread::spawn(move || {
+        loop {
+            let mut task_manager = TaskManager::get().lock().unwrap();
+            let mut update_statistics = false;
+            let b = task_manager.interval_update;
+            thread::sleep(std::time::Duration::from_secs_f64(b));
+            task_manager.count_updates += 1;
+            if (task_manager.count_updates % task_manager.interval_statistics) == 0 {
+                update_statistics = true;
+                task_manager.count_updates = 0;
+            }
+            let mut stats_temp: HashMap<&'static str, TaskStatistics> = HashMap::new();
+            for (name, task) in task_manager.tasks.iter_mut() {
+                match task.update() {
+                    Ok(_) => {
+                        if !update_statistics {
+                            continue;
+                        }
+                        let stats = task.get_stats();
+                        stats_temp.insert(&name, stats);
+                    }
+                    Err(e) => {
+                        eprintln!("Error updating task '{}': {}", name, e);
+                    }
+                }
+            }
+            for (name, stats) in stats_temp.iter() {
+                task_manager.thread_statics.insert(&name, *stats);
+            }
+            if task_manager.send_statistics && update_statistics {
+                todo!(); // Send statistics to monitoring system
+            }   
+        }
+    })
+}
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_task_monitor() {
+        let handle: JoinHandle<()>;
+        {
+            let mut task_manager = TaskManager::get().lock().unwrap();
+            task_manager.set_time_update(0.01);
+            task_manager.set_statistics_interval(1.0);
+            handle = task_manager.create_task("test_task", || {
+                    for _ in 0..10 {
+                        thread::sleep(std::time::Duration::from_millis(250));
+                    }
+            }).unwrap();
+        }
+        
+        
+        start_task_monitoring();
+        handle.join().unwrap();
+        let task_manager = TaskManager::get().lock().unwrap();
+        let stats = task_manager.thread_statics.get("test_task").unwrap();
+        println!("Task Statistics - Mean: {}, Max: {}, Min: {}, Std Dev: {},  P50: {}, P90: {}, P99: {}",
+            stats.mean, stats.max, stats.min, stats.std_dev, stats.p50, stats.p90, stats.p99);
+        assert!(stats.mean >= 0.0);
+    }
+}

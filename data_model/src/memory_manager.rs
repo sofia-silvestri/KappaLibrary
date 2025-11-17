@@ -45,7 +45,7 @@ where T: 'static + Sync + Send + Copy + PartialOrd + PartialEq + Display
         };
         match mm {
             Ok(mut mgr) => {
-                mgr.register_statics(name, Box::new(res.clone()));
+                let _ = mgr.register_statics(name, Box::new(res.clone()));
             }
             Err(_) => {}
         }
@@ -58,7 +58,7 @@ where T: 'static + Sync + Send + Copy + PartialOrd + PartialEq + Display
             let mm= MemoryManager::get_memory_manager();
             match mm {
                 Ok(mut mgr) => {
-                    mgr.register_statics(self.header.name, Box::new(self.clone()));
+                    mgr.update_statics(self.header.name, Box::new(self.clone()));
                 }
                 Err(e) => {
                     return Err(e);
@@ -103,7 +103,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + Pa
         };
         match mm {
             Ok(mut mgr) => {
-                mgr.register_state(name, Box::new(res.clone()));
+                mgr.register_state(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -115,7 +115,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + Pa
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.register_state(self.header.name, Box::new(self.clone()));
+                mgr.update_state(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -169,7 +169,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Copy + Clone + PartialOrd 
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.register_parameters(name, Box::new(res.clone()));
+                mgr.register_parameters(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -192,7 +192,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Copy + Clone + PartialOrd 
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.register_parameters(self.header.name, Box::new(self.clone()));
+                mgr.update_parameters(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -242,13 +242,34 @@ impl MemoryManager {
             }
         }
     }
-    pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) {
+    pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+        if self.mapped_state.contains_key(key) {
+            return Err(StreamingError::AlreadyDefined);
+        }
+        self.mapped_state.insert(key, state);
+        Ok(())
+    }
+    pub fn register_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+        if self.mapped_statics.contains_key(key) {
+            return Err(StreamingError::AlreadyDefined);
+        }
+        self.mapped_statics.insert(key, statics);
+        Ok(())
+    }
+    pub fn register_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+        if self.mapped_parameters.contains_key(key) {
+            return Err(StreamingError::AlreadyDefined);
+        }
+        self.mapped_parameters.insert(key, param);
+        Ok(())
+    }
+    pub fn update_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) {
         self.mapped_state.insert(key, state);
     }
-    pub fn register_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) {
+    pub fn update_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) {
         self.mapped_statics.insert(key, statics);
     }
-    pub fn register_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) {
+    pub fn update_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) {
         self.mapped_parameters.insert(key, param);
     }
     pub fn serialize_all(&self) -> String {

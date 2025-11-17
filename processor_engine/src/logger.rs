@@ -148,7 +148,15 @@ impl StreamProcessor for Logger {
     // Implementazione dei metodi del trait StreamProcessor
     fn init(&mut self) -> Result<(), StreamingError> {
         // Implementazione specifica per Logger
-        let binding = self.get_parameter_value::<&'static str>("file_path").unwrap();
+        let ret = self.get_parameter_value::<&'static str>("log_file_path");
+        let binding: &'static str;
+        match ret {
+            Ok(b) => {binding = b;},
+            Err(_) => {
+                self.set_state(StreamingState::Stopped);
+                return Err(StreamingError::GenericError);
+            }
+        }
         let path = Path::new(binding);
         if !path.exists() {
             let res = fs::create_dir(binding);
@@ -199,6 +207,8 @@ impl StreamProcessor for Logger {
                         }
                     }
                 }
+                let mut output = self.get_output::<LogEntry>("log_redirect");
+                output.as_mut().unwrap().send(log_entry);
                 if error {
                     self.set_state(StreamingState::Stopped);
                     return Err(StreamingError::WriteError);
@@ -230,4 +240,27 @@ macro_rules! log {
             input.send(log_entry);
         }
     };
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    #[test]
+    fn test_logger() {
+        let mut logger = Logger::new(Some("TestLogger"));
+        logger.set_parameter_value("log_file_path", "./test_logs").unwrap();
+        logger.set_parameter_value("log_file_prefix", "test_log").unwrap();
+        logger.set_parameter_value("log_file_suffix", "log").unwrap();
+        logger.set_parameter_value("log_level", LogLevel::Info).unwrap();
+        assert!(logger.init().is_ok());
+        let log_entry = LogEntry::new(LogLevel::Info, "TestModule".to_string(), "This is a test log message.".to_string());
+        let input = logger.get_input_channel::<LogEntry>("log_entry").unwrap();
+        let (output_test, output_receiver) = std::sync::mpsc::sync_channel::<LogEntry>(10);
+        let ret = logger.connect("log_redirect", output_test);
+        assert!(ret.is_ok());
+        input.send(log_entry).unwrap();
+        assert!(logger.process().is_ok());
+        output_receiver.recv().unwrap();
+    }
 }
