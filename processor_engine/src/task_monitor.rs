@@ -160,7 +160,7 @@ impl TaskManager {
     }
 }
 
-static TASK_MANAGER: OnceLock<Mutex<TaskManager>> = OnceLock::new();
+pub static TASK_MANAGER: OnceLock<Mutex<TaskManager>> = OnceLock::new();
 
 pub fn start_task_monitoring() -> JoinHandle<()> {
     thread::spawn(move || {

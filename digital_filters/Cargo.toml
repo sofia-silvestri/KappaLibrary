@@ -1,15 +1,10 @@
 [package]
-name = "filter"
+name = "digital_filters"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-name = "filter"
-crate-type = ["rlib","dylib"]
-
 [dependencies]
 processor_engine = {path = "../processor_engine"}
-connectors_macro = { path = "../processor_engine/src/connectors_macro" }
 stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}
 data_model = {path = "../data_model"}
 utils = {path = "../utils"}

@@ -119,14 +119,12 @@ impl Logger {
         }
         self.log_file_name = self.get_file_path();
         let file = fs::File::create(self.log_file_name.as_str());
-        if (file.is_err()) {
+        if file.is_err() {
             return Err(file.err().unwrap());
         }
-        if (LOG_FILE.get().is_some()) {
-            LOG_FILE.get_or_init(|| Mutex::new(file.unwrap()));
-        } else {
-            LOG_FILE.set(Mutex::new(file.unwrap())).unwrap();
-        }
+        
+        LOG_FILE.set(Mutex::new(file.unwrap())).unwrap();
+        
         Ok(())
     }
 
@@ -238,12 +236,8 @@ macro_rules! log {
     ($logger:expr, $level:expr, $module:expr, $message:expr) => {
         {
             let log_entry = LogEntry::new($level, $module.to_string(), $message.to_string());
-            let input = $logger.inputs.get("log_entry")
-                                        .unwrap()
-                                        .as_any()
-                                        .downcast_ref::<Input<LogEntry>>()
-                                        .unwrap();
-            input.send(log_entry);
+            let input = $logger.get_input_channel::<LogEntry>("log_entry").unwrap();
+            let _ = input.send(log_entry);
         }
     };
 }

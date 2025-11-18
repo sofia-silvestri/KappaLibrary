@@ -1,13 +1,15 @@
 [workspace]
 resolver = "3"
 members = [
-    "processor_engine",
+    "data_model",
     "data_model/src/memory_var_macro",
+    "processor_engine",
     "processor_engine/src/stream_proc_macro",
+    "utils",
+    "interfaces",
     "digital_filters",
     "digital_transform",
-    "utils",
-    "data_model"]
+    ]
 
 [workspace.dependencies]
 num-traits = "0.2.19"

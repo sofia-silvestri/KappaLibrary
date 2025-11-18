@@ -49,6 +49,7 @@ impl<T: 'static + Send + Any + Clone> ConnectorTrait for Input<T> {
     fn get_header(&self) -> &DataHeader {&self.header}
 }
 
+#[derive(Clone)]
 pub struct Output<T: 'static + Send + Clone> {
     pub header: DataHeader,
     pub senders: Vec<SyncSender<T>>,
