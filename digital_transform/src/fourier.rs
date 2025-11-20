@@ -3,7 +3,7 @@ use std::any::Any;
 use std::fmt::{Display, Debug};
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
-use num_traits::{Float, Zero};
+use num_traits::{AsPrimitive, Float, Zero};
 use serde::Serialize;
 use stream_proc_macro::{StreamBlockMacro};
 use data_model::streaming_data::{StreamingError, StreamingState};
@@ -36,15 +36,15 @@ pub struct Fft<T> {
 
 impl<T> Fft<T>
 where
-    T: Into<f64> + From<f64> + Copy + Zero + Float + Display + Debug,
+    T: AsPrimitive<f64> + Copy + Zero + Float + Display + Debug, f64: AsPrimitive<T>,
 {
     pub fn new(inverse: bool, size: usize) -> Self {
         let mut weights: Vec<Complex<T>> = Vec::with_capacity(size);
         for i in 0..size {
-            let angle = if inverse {
-                <T as From<f64>>::from(2.0 * std::f64::consts::PI * (i as f64) / (size as f64))
+            let angle: T = if inverse {
+                (2.0 * std::f64::consts::PI * (i as f64) / (size as f64)).as_()
             } else {
-                <T as From<f64>>::from(-2.0 * std::f64::consts::PI * (i as f64) / (size as f64))
+                (-2.0 * std::f64::consts::PI * (i as f64) / (size as f64)).as_()
             };
             weights.push(Complex::new(angle.cos(), angle.sin()));
         }
@@ -146,11 +146,10 @@ where
     T: 'static 
     + Send 
     + Clone 
-    + Into<f64> 
-    + From<f64>
+    + AsPrimitive<f64>
     + Float
     + Display
-    + Debug,
+    + Debug,  f64: AsPrimitive<T>,
 {
     pub fn new(name: &'static str) -> Self {
         let fft_planner = Fft::<T>::new(false, 2);
@@ -180,11 +179,10 @@ where
     T: 'static 
         + Send 
         + Clone 
-        + Into<f64> 
-        + From<f64>
+        + AsPrimitive<f64>
         + Float
         + Display
-        + Debug,
+        + Debug,  f64: AsPrimitive<T>,
 {
     fn init(&mut self) -> Result<(), StreamingError > {
         if self.check_state(StreamingState::Running) {

@@ -3,4 +3,5 @@ pub mod stream_processor;
 pub mod task_monitor;
 pub mod engine;
 pub mod logger;
+pub mod ffi;
 pub mod test;

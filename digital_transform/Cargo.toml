@@ -3,6 +3,10 @@ name = "digital_transform"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "digital_transform"
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 processor_engine = {path = "../processor_engine"}
 stream_proc_macro = {path = "../processor_engine/src/stream_proc_macro"}

@@ -1,38 +1,35 @@
+use std::ffi::c_char;
+
 use libloading::Library;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Version {
-    pub major: u64,
-    pub minor: u64,
-    pub build: u64,
+    pub major: u32,
+    pub minor: u32,
+    pub build: u32,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct Dependency {
-    pub dep_name: &'static str,
+    pub dep_name: *const c_char,
     pub version: Version,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ModuleStruct {
-    pub name: &'static str,
-    pub description: &'static str,
-    pub authors: &'static str,
-    pub release_date: &'static str,
+    pub name:*const c_char,
+    pub description:*const c_char,
+    pub authors:*const c_char,
+    pub release_date:*const c_char,
     pub version: Version,
-    pub dependency_number: u32,
-    pub dependencies: &'static [&'static Dependency],
-    pub provides_number: u32,
-    pub provides: &'static [&'static str],
-}
-
-#[repr(C)]
-pub struct ModuleHandle {
-    pub module: ModuleStruct,
-    pub _lib: Library,
+    pub dependencies: *const *const Dependency,
+    pub dependency_number: usize,
+    pub provides: *const *const c_char,
+    pub provides_lengths: usize,
 }
 
 unsafe impl Sync for ModuleStruct {}
+

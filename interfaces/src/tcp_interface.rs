@@ -104,7 +104,18 @@ where T: 'static + Send + Clone
                 {               
                     let _lock = self.lock.lock().unwrap();
                     match stream.write(TcpSender::as_byte(&input)) {
-                        Ok(_) => {error_send = false;}
+                        Ok(_) => {
+                            let mut buffer = [0; 65535];
+                            match stream.read(&mut buffer) {
+                                Ok(n) => {
+                                    let response = String::from_utf8_lossy(&buffer[0..n]);
+                                    if response != "Ok" {
+                                        error_send = true;
+                                    } else {error_send = false;}
+                                }
+                                Err(_) => {error_send = true;}
+                            }
+                        }
                         Err(_) => {error_send = true;}
                     };
                 }                
@@ -174,7 +185,20 @@ where
             let mut buffer = [0; 65535];
             match stream.read(&mut buffer) {
                 Ok(n) => {
-                    let _ = sender.send(unsafe{Self::from_bytes(&buffer[0..n]).unwrap().clone()});
+                    let data = unsafe{Self::from_bytes(&buffer[0..n])};
+                    match data {
+                        Ok(data) => {
+                            let _ = sender.send(data.clone());
+                            if stream.write_all("Ok".as_bytes()).is_err() {
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            if stream.write_all("Invalid format".as_bytes()).is_err() {
+                                break;
+                            }
+                        }
+                    }
                 }
                 Err(e) => {
                     eprintln!("Server: Errore nella lettura dal flusso: {}", e);
