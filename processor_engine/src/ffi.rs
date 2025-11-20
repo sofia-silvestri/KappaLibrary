@@ -1,6 +1,6 @@
 use std::{ffi::*, mem};
-use data_model::modules::ModuleStruct;
-use libloading::Library;
+use data_model::{modules::ModuleStruct, streaming_data::StreamingError};
+use libloading::{Library, Symbol};
 use crate::stream_processor::StreamProcessor;
 
 #[repr(C)]
@@ -12,9 +12,48 @@ pub struct FfiStrSlice {
 }
 
 #[repr(C)]
-pub struct ModuleHandle {
+pub struct ModuleHandle<'a> {
     pub module: ModuleStruct,
-    pub _lib: Library,
+    pub lib: &'a Library,
+    pub get_processor_modules: Symbol<'static, unsafe extern "C" fn(*const u8, usize, *const u8, usize) -> TraitObjectRepr>,
+}
+
+impl ModuleHandle<'static> {
+    pub fn new(library_path: &'static str) -> Result<Self, StreamingError> {
+        let library: &'static Library;
+        match unsafe { Library::new(library_path)} {
+            Ok(lib) => {
+                let box_library = Box::leak(Box::new(lib));
+                library = box_library;
+            }
+            Err(_) => {
+                eprintln!("Unable to find");
+                return Err(StreamingError::FileNotFound);
+            }
+        }
+        let module_info: Symbol<*mut ModuleStruct>;
+        match unsafe { library.get(b"MODULE\0") } {
+            Ok(module) => {module_info = module;}
+            Err(_) => {
+                eprintln!("Unable to find");
+                return Err(StreamingError::FileNotFound);
+            }
+        }
+        let funct_ptr: Symbol<unsafe extern "C" fn(*const u8, usize, *const u8, usize) -> TraitObjectRepr>;
+        match unsafe { library.get(b"get_processor_modules")} {
+            Ok(func) => {funct_ptr = func;}
+            Err(_) => {
+                eprintln!("Unable to find");
+                return Err(StreamingError::FileNotFound);
+            }
+        }
+        let handle = Self {
+            lib: library,
+            module: unsafe{**module_info},
+            get_processor_modules: funct_ptr,
+        };
+        Ok(handle)
+    }
 }
 
 // Representazione C-compatible of trait object

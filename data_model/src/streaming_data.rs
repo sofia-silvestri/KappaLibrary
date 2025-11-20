@@ -44,6 +44,7 @@ pub enum StreamingError {
     OutOfRange,
     WrongType,
     PathError,
+    FileNotFound,
     CreateError,
     ReadError,
     WriteError,
