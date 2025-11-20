@@ -15,17 +15,17 @@ use serde::Serialize;
 pub trait StreamBlock {
     fn new_input<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
     fn new_output<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
-    fn new_parameter<T: 'static + Send + Sync + Copy + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
-    fn new_statics<T: 'static + Send + Sync + Copy + Serialize + PartialEq + PartialOrd+ Display> (&mut self, key: &'static str, value: T) -> Result<(), StreamingError>;
+    fn new_parameter<T: 'static + Send + Sync + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
+    fn new_statics<T: 'static + Send + Sync + Clone + Serialize + PartialEq + PartialOrd+ Display> (&mut self, key: &'static str, value: T) -> Result<(), StreamingError>;
     fn get_input<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
     fn get_output<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
-    fn get_parameter<T: Send + Sync + Copy + Clone + Display> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
+    fn get_parameter<T: 'static + Send + Sync + Clone + Display> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
     fn get_statics<T: 'static + Send + Sync + Display> (&self, key: &str) -> Result<&Statics<T>, StreamingError>;
     fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<SyncSender<T>, StreamingError>;
     fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<T>) -> Result<(), StreamingError>;
-    fn get_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync+Display>(&self, key: &str) -> Result<T, StreamingError>;
-    fn set_parameter_value<T: 'static + Send + PartialOrd + Clone + Copy + Serialize + Sync+ Display>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
-    fn set_statics_value<T: 'static + Send + Clone + Copy + Serialize + Sync + Display + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn get_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+Display>(&self, key: &str) -> Result<T, StreamingError>;
+    fn set_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+ Display>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn set_statics_value<T: 'static + Send + Clone + Serialize + Sync + Display + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
     fn recv_input<T: 'static + Send+Clone> (&mut self, key: &str) -> Result<T, StreamingError>;
     fn send_output<T: 'static +  Send+Clone> (&self, key: &str, value: T) -> Result<(), StreamingError>;
 }

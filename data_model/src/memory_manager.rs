@@ -33,7 +33,7 @@ pub struct Statics<T: 'static + Sync + Send + Display> {
 }
 
 impl<T> Statics<T> 
-where T: 'static + Sync + Send + Copy + PartialOrd + PartialEq + Display
+where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
 {
     pub fn new(name: &'static str, value: T) -> Self {
         let mm= MemoryManager::get_memory_manager();
@@ -71,12 +71,12 @@ where T: 'static + Sync + Send + Copy + PartialOrd + PartialEq + Display
         }
     }
     pub fn get_value(&self) -> T {
-        self.value
+        self.value.clone()
     }
 }
 
 impl<T> StaticsTrait for Statics<T> 
-where T: 'static + Sync + Send + Copy + Display
+where T: 'static + Sync + Send + Display
 {
     fn is_settable(&self) -> bool {
         self.settable
@@ -91,7 +91,7 @@ pub struct State<T: 'static +Send + Sync + Display> {
     lock: Arc<Mutex<()>>,
 }
 
-impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + PartialEq + Display
+impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq + Display
 {
     pub fn new(name: &'static str, value: T) -> Self {
         let mm= MemoryManager::get_memory_manager();
@@ -125,22 +125,22 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + Copy + PartialOrd + Pa
     }
     pub fn get_value(&self) -> T {
         let _locked = self.lock.lock().unwrap();
-        self.value
+        self.value.clone()
     }
     pub fn connect(&mut self, sender: SyncSender<T>) {
         self.senders.push(sender);
     }
     pub fn send(&self) {
         for s in &self.senders {
-            let _ = s.send(self.value);
+            let _ = s.send(self.value.clone());
         }
     }
 }
-impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Copy + Display{
+impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Display{
     fn clone(&self) -> Self {
         Self {
             header: DataHeader{name: self.header.name},
-            value: self.value,
+            value: self.value.clone(),
             senders: self.senders.clone(),
             lock: self.lock.clone(),
         }
@@ -148,7 +148,7 @@ impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Copy + Displ
 }
 
 #[derive(MemoryVarMacro)]
-pub struct Parameter<T:'static + Send + Sync + Copy + Clone + Display> {
+pub struct Parameter<T:'static + Send + Sync + Clone + Display> {
     pub header: DataHeader,
     pub value: T,
     pub default: T,
@@ -156,7 +156,7 @@ pub struct Parameter<T:'static + Send + Sync + Copy + Clone + Display> {
     lock: Arc<Mutex<()>>,
 }
 
-impl<T> Parameter<T> where T:'static +  Send + Sync + Copy + Clone + PartialOrd + Display{
+impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Display{
     pub fn new(name: &'static str, value: T, limits: Option<[T; 2]>) -> Self {
         let default = value.clone();
         let res = Self {
@@ -202,13 +202,13 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Copy + Clone + PartialOrd 
     }
 }
 
-impl<T> Clone for Parameter<T> where T: Send + Sync + Copy + Clone + Display {
+impl<T> Clone for Parameter<T> where T: Send + Sync + Clone + Display {
     fn clone(&self) -> Self {
         Self {
             header: DataHeader{name: self.header.name},
             value: self.value.clone(),
-            default: self.default,
-            limits: self.limits,
+            default: self.default.clone(),
+            limits: self.limits.clone(),
             lock: self.lock.clone(),
         }
     }

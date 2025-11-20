@@ -1,5 +1,5 @@
 use std::{ffi::*, mem};
-use data_model::{modules::ModuleStruct, streaming_data::StreamingError};
+use data_model::{modules::{ModuleStruct,ModuleStructFFI}, streaming_data::StreamingError};
 use libloading::{Library, Symbol};
 use crate::stream_processor::StreamProcessor;
 
@@ -12,6 +12,7 @@ pub struct FfiStrSlice {
 }
 
 #[repr(C)]
+#[derive(Clone)]
 pub struct ModuleHandle<'a> {
     pub module: ModuleStruct,
     pub lib: &'a Library,
@@ -19,7 +20,7 @@ pub struct ModuleHandle<'a> {
 }
 
 impl ModuleHandle<'static> {
-    pub fn new(library_path: &'static str) -> Result<Self, StreamingError> {
+    pub fn new(library_path: String) -> Result<Self, StreamingError> {
         let library: &'static Library;
         match unsafe { Library::new(library_path)} {
             Ok(lib) => {
@@ -31,7 +32,7 @@ impl ModuleHandle<'static> {
                 return Err(StreamingError::FileNotFound);
             }
         }
-        let module_info: Symbol<*mut ModuleStruct>;
+        let module_info: Symbol<*mut ModuleStructFFI>;
         match unsafe { library.get(b"MODULE\0") } {
             Ok(module) => {module_info = module;}
             Err(_) => {
@@ -39,6 +40,7 @@ impl ModuleHandle<'static> {
                 return Err(StreamingError::FileNotFound);
             }
         }
+        let module = unsafe{**module_info}.into();
         let funct_ptr: Symbol<unsafe extern "C" fn(*const u8, usize, *const u8, usize) -> TraitObjectRepr>;
         match unsafe { library.get(b"get_processor_modules")} {
             Ok(func) => {funct_ptr = func;}
@@ -49,7 +51,7 @@ impl ModuleHandle<'static> {
         }
         let handle = Self {
             lib: library,
-            module: unsafe{**module_info},
+            module: module,
             get_processor_modules: funct_ptr,
         };
         Ok(handle)
@@ -97,25 +99,5 @@ pub fn free_object(repr: TraitObjectRepr) {
         
         // Box::from_raw riprende la proprietà del Box originale e lo dealloca
         let _boxed_trait: Box<dyn StreamProcessor> = Box::from_raw(trait_heap_pointer);
-    }
-}
-
-
-pub fn c_char_to_string(c_ptr: *const c_char) -> Result<String, String> {
-    if c_ptr.is_null() {
-        return Err("Null pointer.".to_string());
-    }
-
-    let c_str = unsafe {
-        CStr::from_ptr(c_ptr)
-    };
-
-    match c_str.to_str() {
-        Ok(s) => {
-            Ok(s.to_owned()) 
-        }
-        Err(e) => {
-            Err(format!("UTF-8 decoding error: {}", e))
-        }
     }
 }

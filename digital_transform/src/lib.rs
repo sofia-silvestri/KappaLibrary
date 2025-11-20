@@ -2,12 +2,12 @@ pub mod fourier;
 
 use std::ffi::{c_char, c_void};
 
-use data_model::modules::{Version,ModuleStruct};
+use data_model::modules::{Version,ModuleStructFFI};
 use processor_engine::stream_processor::{StreamBlockDyn, StreamProcessor};
 use processor_engine::ffi::{TraitObjectRepr, export_stream_processor, get_error_return};
 
 #[unsafe(no_mangle)]
-pub static MODULE: ModuleStruct  = ModuleStruct {
+pub static MODULE: ModuleStructFFI  = ModuleStructFFI {
     name: b"digital_transform\0".as_ptr() as *const c_char,
     description: b"Library of processing block for signal transformation in frequency domain\0".as_ptr() as *const c_char,
     authors: b"Sofia Silvestri\0".as_ptr() as *const c_char,

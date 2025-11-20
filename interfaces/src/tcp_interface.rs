@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::thread::JoinHandle;
@@ -53,7 +53,7 @@ where
         };
         ret.new_input::<T>("input").unwrap();
         ret.new_statics::<u16>("port", 50000).unwrap();
-        ret.new_statics::<&'static str>("address", "0.0.0.0").unwrap();
+        ret.new_statics::<String>("address", "0.0.0.0".to_string()).unwrap();
         ret
     }
     pub fn as_byte(value: &T) -> &[u8] {
@@ -81,7 +81,7 @@ where T: 'static + Send + Clone
             return  Err(StreamingError::InvalidStatics);
         }
         let port = self.get_statics::<u16>("port").expect("").get_value();
-        let address = self.get_statics::<&'static str>("address").expect("").get_value();
+        let address = self.get_statics::<String>("address").expect("").get_value();
         match TcpStream::connect(format!("{}:{}", address, port)) {
             Ok(tcp_stream) => {self.tcp_stream = Some(tcp_stream);}
             Err(_) => {
@@ -165,14 +165,25 @@ where
             tcp_listen: None,
             tcp_handle: Vec::new(),
         };
-        ret.new_input::<T>("input").unwrap();
+        ret.new_output::<T>("output").unwrap();
         ret.new_statics::<u16>("port", 50000).unwrap();
-        ret.new_statics::<&'static str>("address", "0.0.0.0").unwrap();
+        ret.new_statics::<String>("address", "0.0.0.0".to_string()).unwrap();
         ret
     }
     pub unsafe fn from_bytes<'a>(data: &'a [u8]) -> Result<&'a T, StreamingError> {
+        if TypeId::of::<T>() == TypeId::of::<String>() {
+            let string = String::from_utf8_lossy(data).into_owned();
+            return Ok(unsafe {&*(Box::leak(Box::new(string)) as *mut String as *mut T)});
+        }
+        if TypeId::of::<T>() == TypeId::of::<str>() {
+            let string = String::from_utf8_lossy(data).into_owned();
+            let boxed_string: Box<String> = Box::new(string);
+            let static_string_ref: &'static mut String = Box::leak(boxed_string);
+            let typed_ptr: *mut T = static_string_ref as *mut String as *mut T;
+            return Ok(unsafe {&*typed_ptr});
+        }
         if data.len() != mem::size_of::<T>() {
-            eprintln!("Dimensione slice errata!");
+            eprintln!("Wrong slice dimension!");
             return Err(StreamingError::InvalidInput);
         }
         let ptr = data.as_ptr();
@@ -189,12 +200,12 @@ where
                     match data {
                         Ok(data) => {
                             let _ = sender.send(data.clone());
-                            if stream.write_all("Ok".as_bytes()).is_err() {
+                            if stream.write_all("Ok\n".as_bytes()).is_err() {
                                 break;
                             }
                         }
                         Err(_) => {
-                            if stream.write_all("Invalid format".as_bytes()).is_err() {
+                            if stream.write_all("Invalid format\n".as_bytes()).is_err() {
                                 break;
                             }
                         }
@@ -223,7 +234,7 @@ where T: 'static + Send + Clone
             return  Err(StreamingError::InvalidStatics);
         }
         let port = self.get_statics::<u16>("port").expect("").get_value();
-        let address = self.get_statics::<&'static str>("address").expect("").get_value();
+        let address = self.get_statics::<String>("address").expect("").get_value();
         match TcpListener::bind(format!("{}:{}", address, port)) {
             Ok(tcp_listen) => {self.tcp_listen = Some(tcp_listen);}
             Err(_) => {
