@@ -165,7 +165,8 @@ where
             tcp_listen: None,
             tcp_handle: Vec::new(),
         };
-        ret.new_output::<T>("output").unwrap();
+        ret.new_input::<T>("response").unwrap();
+        ret.new_output::<T>("received").unwrap();
         ret.new_statics::<u16>("port", 50000).unwrap();
         ret.new_statics::<String>("address", "0.0.0.0".to_string()).unwrap();
         ret
@@ -200,9 +201,6 @@ where
                     match data {
                         Ok(data) => {
                             let _ = sender.send(data.clone());
-                            if stream.write_all("Ok\n".as_bytes()).is_err() {
-                                break;
-                            }
                         }
                         Err(_) => {
                             if stream.write_all("Invalid format\n".as_bytes()).is_err() {
@@ -215,7 +213,7 @@ where
                     eprintln!("Server: Errore nella lettura dal flusso: {}", e);
                 }
             }
-            if *THREAD_EXIT.get_or_init(|| Mutex::new(false)).lock().unwrap() == true {
+            if *THREAD_EXIT.get_or_init(|| Arc::new(Mutex::new(false))).lock().unwrap() == true {
                 break;
             }
         }
@@ -255,7 +253,7 @@ where T: 'static + Send + Clone
             if stream.is_ok() {
                 log!(self.logger, LogLevel::Info, self.name, "New connection.");
                 let _lock = self.lock.lock().unwrap();
-                let output = self.get_output::<T>("output").expect("").clone();
+                let output = self.get_output::<T>("received").expect("").clone();
                 let mut tm = TaskManager::get().lock().unwrap();
                 let name = self.name;
                 let handle = tm.create_task(name, move|| {
@@ -270,7 +268,7 @@ where T: 'static + Send + Clone
         Ok(())
     }
     fn stop(&mut self) -> Result<(), StreamingError > {
-        THREAD_EXIT.get_or_init(|| Mutex::new(true));
+        THREAD_EXIT.get_or_init(|| Arc::new(Mutex::new(true)));
         for j in self.tcp_handle.drain(..) {
             let _ = j.join();
         }
@@ -279,4 +277,4 @@ where T: 'static + Send + Clone
     }
 }
 
-static THREAD_EXIT: OnceLock<Mutex<bool>> = OnceLock::new();
+static THREAD_EXIT: OnceLock<Arc<Mutex<bool>>> = OnceLock::new();

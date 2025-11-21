@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, Arc};
 use data_model::streaming_data::StreamingError;
 
 use crate::stream_processor::StreamProcessor;
@@ -13,7 +13,7 @@ impl ProcessorEngine {
         Self { processor_map: HashMap::new() }
     }
     pub fn get() -> &'static Mutex<ProcessorEngine> {
-        PROCESSOR_ENGINE.get_or_init(|| Mutex::new(ProcessorEngine::new()))
+        PROCESSOR_ENGINE.get_or_init(|| Arc::new(Mutex::new(ProcessorEngine::new())))
     }
     pub fn register_processor(&mut self, name: &'static str, processor: Box<dyn StreamProcessor>) -> Result<(), StreamingError> {
         if self.processor_map.contains_key(name) {
@@ -42,7 +42,7 @@ impl ProcessorEngine {
     }
 }
 
-static PROCESSOR_ENGINE: OnceLock<Mutex<ProcessorEngine>> = OnceLock::new();
+static PROCESSOR_ENGINE: OnceLock<Arc<Mutex<ProcessorEngine>>> = OnceLock::new();
 
 #[cfg(test)]
 mod test {

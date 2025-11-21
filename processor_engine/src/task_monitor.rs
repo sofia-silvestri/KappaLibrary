@@ -1,5 +1,5 @@
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, Arc};
 use std::thread::{self, JoinHandle};
 use std::fmt;
 use chrono::{DateTime, Utc};
@@ -124,7 +124,7 @@ impl TaskManager {
         }
     }
     pub fn get() -> &'static Mutex<TaskManager> {
-        TASK_MANAGER.get_or_init(|| Mutex::new(TaskManager::new()))
+        TASK_MANAGER.get_or_init(|| Arc::new(Mutex::new(TaskManager::new())))
     }
     pub fn set_time_update(&mut self, interval_update: f64) {
         self.interval_update = interval_update;
@@ -160,7 +160,7 @@ impl TaskManager {
     }
 }
 
-pub static TASK_MANAGER: OnceLock<Mutex<TaskManager>> = OnceLock::new();
+pub static TASK_MANAGER: OnceLock<Arc<Mutex<TaskManager>>> = OnceLock::new();
 
 pub fn start_task_monitoring() -> JoinHandle<()> {
     thread::spawn(move || {
