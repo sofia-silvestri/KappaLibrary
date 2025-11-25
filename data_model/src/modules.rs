@@ -40,6 +40,11 @@ pub struct Dependency {
     pub dep_name: String,
     pub version: Version,
 }
+impl std::fmt::Display for Dependency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}.{}.{}", self.dep_name, self.version.major, self.version.minor, self.version.build)
+    }
+}
 impl From<DependencyFFI> for Dependency {
     fn from(ffi: DependencyFFI) -> Self {
         let name = c_char_to_string(ffi.dep_name).unwrap_or_default();

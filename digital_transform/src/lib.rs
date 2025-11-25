@@ -1,9 +1,9 @@
 pub mod fourier;
 
-use std::ffi::{c_char, c_void};
+use std::ffi::c_char;
 
 use data_model::modules::{Version,ModuleStructFFI};
-use processor_engine::stream_processor::{StreamBlockDyn, StreamProcessor};
+use processor_engine::stream_processor::StreamProcessor;
 use processor_engine::ffi::{TraitObjectRepr, export_stream_processor, get_error_return};
 
 #[unsafe(no_mangle)]
