@@ -28,6 +28,7 @@ pub trait StaticsTrait : Send + Sync + DataTrait {
 pub struct Statics<T: 'static + Sync + Send + Display> {
     pub header: DataHeader,
     value: T,
+    limits: Option<[T; 2]>,
     settable: bool,
     lock: Arc<Mutex<()>>,
 }
@@ -35,11 +36,12 @@ pub struct Statics<T: 'static + Sync + Send + Display> {
 impl<T> Statics<T> 
 where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
 {
-    pub fn new(name: &'static str, value: T) -> Self {
+    pub fn new(name: &'static str, value: T, limits: Option<[T; 2]>) -> Self {
         let mm= MemoryManager::get_memory_manager();
         let res = Self {
             header: DataHeader{name},
             value,
+            limits,
             settable: true,
             lock: Arc::new(Mutex::new(())),
         };

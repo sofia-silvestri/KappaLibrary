@@ -15,8 +15,9 @@ use serde::Serialize;
 pub trait StreamBlock {
     fn new_input<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
     fn new_output<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
+    fn new_state<T: 'static + Send + Send + Sync + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: T) -> Result<(), StreamingError>;
     fn new_parameter<T: 'static + Send + Sync + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
-    fn new_statics<T: 'static + Send + Sync + Clone + Serialize + PartialEq + PartialOrd+ Display> (&mut self, key: &'static str, value: T) -> Result<(), StreamingError>;
+    fn new_statics<T: 'static + Send + Sync + Clone + Serialize + PartialEq + PartialOrd+ Display> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
     fn get_input<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
     fn get_output<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
     fn get_parameter<T: 'static + Send + Sync + Clone + Display> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;

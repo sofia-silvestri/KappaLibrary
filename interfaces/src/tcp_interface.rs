@@ -84,8 +84,8 @@ where
             tcp_stream: None,
         };
         ret.new_input::<T>("input").unwrap();
-        ret.new_statics::<u16>("port", 50000).unwrap();
-        ret.new_statics::<String>("address", "0.0.0.0".to_string()).unwrap();
+        ret.new_statics::<u16>("port", 50000, None).unwrap();
+        ret.new_statics::<String>("address", "0.0.0.0".to_string(), None).unwrap();
         ret
     }
 }
@@ -196,8 +196,8 @@ where
         };
         ret.new_input::<TcpMessage<T>>("response").unwrap();
         ret.new_output::<TcpMessage<T>>("received").unwrap();
-        ret.new_statics::<u16>("port", 50000).unwrap();
-        ret.new_statics::<String>("address", "0.0.0.0".to_string()).unwrap();
+        ret.new_statics::<u16>("port", 50000, None).unwrap();
+        ret.new_statics::<String>("address", "0.0.0.0".to_string(), None).unwrap();
         ret
     }
     pub fn handle_client(mut stream: TcpStream,

@@ -100,6 +100,14 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 self.outputs.insert(qualified_name, Box::new(Output::<V>::new(qualified_name)));
                 Ok(())
             }
+            fn new_state<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: V,) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                if self.state.contains_key(qualified_name) {
+                    return Err(StreamingError::AlreadyDefined);
+                }
+                self.state.insert(qualified_name, Box::new(State::<V>::new(qualified_name, value)));
+                Ok(())
+            }
             fn new_parameter<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Display> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamingError> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.parameters.contains_key(qualified_name) {
@@ -108,12 +116,12 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                 self.parameters.insert(qualified_name, Box::new(Parameter::<V>::new(qualified_name, value, limits)));
                 Ok(())
             }
-            fn new_statics<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + PartialEq+Display> (&mut self, key: &'static str, value: V) -> Result<(), StreamingError> {
+            fn new_statics<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + PartialEq+Display> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamingError> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.statics.contains_key(qualified_name) {
                     return Err(StreamingError::AlreadyDefined);
                 }
-                self.statics.insert(qualified_name, Box::new(Statics::<V>::new(qualified_name, value)));
+                self.statics.insert(qualified_name, Box::new(Statics::<V>::new(qualified_name, value, limits)));
                 Ok(())
             }
             fn get_input<V: Send+Clone> (&self, key: &str) -> Result<&Input<V>, StreamingError> {

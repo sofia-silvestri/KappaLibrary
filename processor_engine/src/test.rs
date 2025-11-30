@@ -37,7 +37,7 @@ impl TestBlock {
         ret.new_input::<i32>("test_input");
         ret.new_output::<f32>("test_output");
         ret.new_parameter::<bool>("change_sign", false, None);
-        ret.new_statics::<i32>("sum_value", 0);
+        ret.new_statics::<i32>("sum_value", 0, None);
 
         ret
     }
