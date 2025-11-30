@@ -243,6 +243,33 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                     Err(StreamingError::InvalidParameter)
                 }
             }
+            fn set_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Display>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                if let Some(container) = self.state.get_mut(qualified_name) {
+                    let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
+                    if let Some(state) = any_mut.downcast_mut::<State<V>>() {
+                        state.set_value(value);
+                        Ok(())
+                    } else {
+                        Err(StreamingError::WrongType)
+                    }
+                } else {
+                    Err(StreamingError::InvalidParameter)
+                }
+            }
+            fn get_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Display>(&mut self, key: &str) -> Result<V, StreamingError> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                if let Some(container) = self.state.get_mut(qualified_name) {
+                    let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
+                    if let Some(state) = any_mut.downcast_mut::<State<V>>() {
+                        Ok(state.get_value())
+                    } else {
+                        Err(StreamingError::WrongType)
+                    }
+                } else {
+                    Err(StreamingError::InvalidParameter)
+                }
+            }
             fn recv_input<V: 'static + Send+Clone> (&mut self, key: &str) -> Result<V , StreamingError> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.inputs.get_mut(qualified_name) {

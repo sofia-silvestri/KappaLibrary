@@ -27,6 +27,8 @@ pub trait StreamBlock {
     fn get_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+Display>(&self, key: &str) -> Result<T, StreamingError>;
     fn set_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+ Display>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
     fn set_statics_value<T: 'static + Send + Clone + Serialize + Sync + Display + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn get_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Display>(&mut self, key: &str) -> Result<T, StreamingError>;
+    fn set_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Display>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
     fn recv_input<T: 'static + Send+Clone> (&mut self, key: &str) -> Result<T, StreamingError>;
     fn send_output<T: 'static +  Send+Clone> (&self, key: &str, value: T) -> Result<(), StreamingError>;
 }
