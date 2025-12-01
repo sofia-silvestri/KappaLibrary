@@ -7,8 +7,6 @@ members = [
     "processor_engine/src/stream_proc_macro",
     "utils",
     "interfaces",
-    "digital_filters",
-    "digital_transform",
     ]
 
 [workspace.dependencies]

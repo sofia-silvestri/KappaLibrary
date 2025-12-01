@@ -1,5 +1,7 @@
 use std::ffi::{c_char, CStr};
 
+use serde::{Deserialize, Serialize};
+
 
 pub fn c_char_to_string(c_ptr: *const c_char) -> Result<String, String> {
     if c_ptr.is_null() {
@@ -21,7 +23,7 @@ pub fn c_char_to_string(c_ptr: *const c_char) -> Result<String, String> {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Version {
     pub major: u32,
     pub minor: u32,
@@ -35,7 +37,7 @@ pub struct DependencyFFI {
     pub version: Version,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Dependency {
     pub dep_name: String,
     pub version: Version,
@@ -71,7 +73,7 @@ pub struct ModuleStructFFI {
 
 unsafe impl Sync for ModuleStructFFI {}
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ModuleStruct {
     pub name: String,
     pub description: String,
