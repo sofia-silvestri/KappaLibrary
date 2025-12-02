@@ -47,7 +47,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
         };
         match mm {
             Ok(mut mgr) => {
-                let _ = mgr.register_statics(name, Box::new(res.clone()));
+                let _ = mgr.get_memory_mode().unwrap().register_statics(name, Box::new(res.clone()));
             }
             Err(_) => {}
         }
@@ -60,7 +60,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
             let mm= MemoryManager::get_memory_manager();
             match mm {
                 Ok(mut mgr) => {
-                    mgr.update_statics(self.header.name, Box::new(self.clone()));
+                    mgr.get_memory_mode().unwrap().update_statics(self.header.name, Box::new(self.clone()));
                 }
                 Err(e) => {
                     return Err(e);
@@ -105,7 +105,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         };
         match mm {
             Ok(mut mgr) => {
-                mgr.register_state(name, Box::new(res.clone())).unwrap();
+                mgr.get_memory_mode().unwrap().register_state(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -117,7 +117,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.update_state(self.header.name, Box::new(self.clone()));
+                mgr.get_memory_mode().unwrap().update_state(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -171,7 +171,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Displ
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.register_parameters(name, Box::new(res.clone())).unwrap();
+                mgr.get_memory_mode().unwrap().register_parameters(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -194,7 +194,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Displ
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.update_parameters(self.header.name, Box::new(self.clone()));
+                mgr.get_memory_mode().unwrap().update_parameters(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -215,33 +215,18 @@ impl<T> Clone for Parameter<T> where T: Send + Sync + Clone + Display {
         }
     }
 }
-pub struct MemoryManager {
+pub struct MemoryMode {
     mapped_state:       HashMap<&'static str, Box<dyn DataTrait>>,
     mapped_statics:     HashMap<&'static str, Box<dyn DataTrait>>,
     mapped_parameters:  HashMap<&'static str, Box<dyn DataTrait>>
 }
 
-impl MemoryManager {
-    fn new() -> Self {
+impl MemoryMode {
+    pub fn new() -> Self {
         Self {
             mapped_state: HashMap::new(),
             mapped_statics: HashMap::new(),
             mapped_parameters: HashMap::new(),
-        }
-    }
-    fn get_instance() -> &'static Mutex<MemoryManager> {
-        MEMORY_MANAGER.get_or_init( || Mutex::new(MemoryManager::new()))
-    }
-    pub fn get_memory_manager() -> Result<MutexGuard<'static, MemoryManager>, StreamingError> {
-        let memory_mutex = MemoryManager::get_instance();
-        let manager = memory_mutex.lock();
-        match manager {
-            Ok(mgr) => {
-                Ok(mgr)
-            }
-            Err(_) => {
-                Err(StreamingError::InvalidOperation)
-            }
         }
     }
     pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) -> Result<(), StreamingError> {
@@ -298,7 +283,40 @@ impl MemoryManager {
     }
 }
 
-static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
+pub struct MemoryManager {
+    memory_modes: HashMap<usize, MemoryMode>,
+    current_mode_index: usize,
+}
+
+impl MemoryManager {
+    fn new() -> Self {
+        MemoryManager {
+            memory_modes: HashMap::new(),
+            current_mode_index: 0,
+        }
+    }
+    pub fn get_memory_manager() -> Result<MutexGuard<'static, MemoryManager>, StreamingError> {
+        let manager = MemoryManager::get_instance();
+        match manager.lock() {
+            Ok(guard) => Ok(guard),
+            Err(_) => Err(StreamingError::GenericError),
+        }
+    }
+    pub fn get_instance() -> &'static Mutex<MemoryManager> {
+        MEMORY_MANAGER.get_or_init( || Mutex::new(MemoryManager::new()))
+    }
+    pub fn new_mode(&mut self, index: usize) {
+        self.memory_modes.insert(index, MemoryMode::new());
+    }
+    pub fn set_mode(&mut self, index: usize) {
+        self.current_mode_index = index;
+    }
+    pub fn get_memory_mode(&mut self) -> Option<&mut MemoryMode> {
+        self.memory_modes.get_mut(&self.current_mode_index)
+    }
+}
+
+pub static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use processor_engine::stream_processor::StreamProcessor;
-use data_model::streaming_data::StreamingError;
+use data_model::{memory_manager::MemoryManager, streaming_data::StreamingError};
 pub struct ProcessorNode {
     pub processor: Box<dyn StreamProcessor>,
     pub next_node: Option<Box<ProcessorNode>>,
@@ -136,10 +136,12 @@ impl ProcessorManager {
             return Ok(());
         }
         if self.modes.contains_key(&index) {
+            // Stop current mode
             let mut curr_mode = self.modes.get_mut(&self.current_mode_index).unwrap().clone();
             curr_mode.stop().unwrap();
             // Switch memory manager
-            
+            MemoryManager::get_memory_manager().unwrap().set_mode(self.current_mode_index);
+            // Start new mode
             self.current_mode_index = index;
             let mut new_mode = self.modes.get_mut(&self.current_mode_index).unwrap().clone();
             std::thread::spawn( move || {
