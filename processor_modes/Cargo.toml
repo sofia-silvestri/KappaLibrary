@@ -1,0 +1,8 @@
+[package]
+name = "processor_modes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+data_model = { path = "../data_model"}
+processor_engine = { path = "../processor_engine"}
