@@ -135,15 +135,15 @@ impl TaskManager {
     pub fn set_statistics_interval(&mut self, interval_statistics: f64) {
         self.interval_statistics = (interval_statistics/self.interval_update) as usize;
     }
-    pub fn create_task<F, T, S: Copy>(&mut self, name: S, f: F) -> std::io::Result<JoinHandle<T>>
+    pub fn create_task<F, T, S: Clone>(&mut self, name: S, f: F) -> std::io::Result<JoinHandle<T>>
     where
         F: FnOnce() -> T + Send + 'static, 
         T: Send + 'static, 
         S: Into<String> + fmt::Display, 
     {
-        let builder = thread::Builder::new().name(name.into());  
+        let builder = thread::Builder::new().name(name.clone().into());  
         let thread_id = unsafe { pthread_self() };
-        let name: &'static str = Box::leak(Box::new(name.to_string()));
+        let name: &'static str = Box::leak(Box::new(name.to_string().clone()));
         let task = Task::new(name, thread_id);
         self.tasks.insert(name, task); 
         self.thread_statics.insert(name, TaskStatistics {

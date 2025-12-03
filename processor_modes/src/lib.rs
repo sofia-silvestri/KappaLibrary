@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::JoinHandle};
 
 use processor_engine::stream_processor::StreamProcessor;
 use data_model::{memory_manager::MemoryManager, streaming_data::StreamingError};
+use processor_engine::task_monitor::TaskManager;
 pub struct ProcessorNode {
     pub processor: Box<dyn StreamProcessor>,
     pub next_node: Option<Box<ProcessorNode>>,
@@ -9,14 +10,16 @@ pub struct ProcessorNode {
 }
 #[derive(Clone)]
 pub struct ProcessorChain {
+    pub name: String,
     pub head: Option<*mut ProcessorNode>,
     pub tail: Option<*mut ProcessorNode>,
     pub nodes: Vec<*mut ProcessorNode>,
 }
 
 impl ProcessorChain {
-    pub fn new() -> Self {
+    pub fn new(name: String) -> Self {
         ProcessorChain {
+            name,
             head: None,
             tail: None,
             nodes: Vec::new(),
@@ -95,13 +98,14 @@ impl ProcessorMode {
     }
     pub fn run(&mut self) -> Result<(), StreamingError> {
         let mut handles = Vec::new();
+        let mut tm = TaskManager::get().lock().unwrap();
         for mut chain in self.chains.clone().into_iter() {
-            let handle = std::thread::spawn( move|| {
+            let handle = tm.create_task(chain.name.clone(), move|| {
                 loop {
                     chain.process().unwrap();
                 }
             });
-            handles.push(handle);
+            handles.push(handle.unwrap());
         }
         for handle in handles.drain(..) {
             handle.join().unwrap();
@@ -119,12 +123,14 @@ impl ProcessorMode {
 pub struct ProcessorManager {
     pub modes: HashMap<usize, ProcessorMode>,
     pub current_mode_index: usize,
+    pub curr_mode_handle: Option<JoinHandle<()>>,
 }
 impl ProcessorManager {
     pub fn new() -> Self {
         ProcessorManager {
             modes: HashMap::new(),
             current_mode_index: 0,
+            curr_mode_handle: None,
         }
     }
     pub fn add_mode(&mut self, mode: ProcessorMode) {
@@ -137,17 +143,21 @@ impl ProcessorManager {
             return Ok(());
         }
         if self.modes.contains_key(&index) {
+            if let Some(handle) = self.curr_mode_handle.take() {
             // Stop current mode
-            let mut curr_mode = self.modes.get_mut(&self.current_mode_index).unwrap().clone();
-            curr_mode.stop().unwrap();
+                let mut curr_mode = self.modes.get_mut(&self.current_mode_index).unwrap().clone();
+                curr_mode.stop().unwrap();
+                handle.join().unwrap();
+            }
             // Switch memory manager
             MemoryManager::get_memory_manager().unwrap().set_mode(self.current_mode_index);
             // Start new mode
             self.current_mode_index = index;
             let mut new_mode = self.modes.get_mut(&self.current_mode_index).unwrap().clone();
-            std::thread::spawn( move || {
+            let mut tm = TaskManager::get().lock().unwrap();
+            self.curr_mode_handle  = Some(tm.create_task( new_mode.name.clone(), move || {
                 new_mode.run().unwrap();
-            });
+            }).unwrap());
             Ok(())
         } else {
             Err(format!("Mode with index {} does not exist.", index))
