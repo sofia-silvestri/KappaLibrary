@@ -40,6 +40,15 @@ impl ProcessorEngine {
         }
         Ok(())
     }
+
+    pub fn execute_command(&mut self, processor_name: &str, command: &str, args: Vec<&str>) -> Result<String, StreamingError> {
+        match self.processor_map.get_mut(processor_name) {
+            Some(processor) => {
+                processor.execute_command(command, args)
+            },
+            None => Err(StreamingError::InvalidInput),
+        }
+    }
 }
 
 static PROCESSOR_ENGINE: OnceLock<Arc<Mutex<ProcessorEngine>>> = OnceLock::new();

@@ -76,6 +76,9 @@ pub trait StreamProcessor: StreamBlockDyn {
         self.set_state(StreamingState::Stopped);
         Ok(())
     }
+    fn execute_command(&mut self, command: &str, args: Vec<&str>) -> Result<String, StreamingError> {
+        Err(StreamingError::InvalidOperation)
+    }
 }
 
 #[repr(C)]
