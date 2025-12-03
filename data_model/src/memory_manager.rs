@@ -47,7 +47,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
         };
         match mm {
             Ok(mut mgr) => {
-                let _ = mgr.get_memory_mode().unwrap().register_statics(name, Box::new(res.clone()));
+                let _ = mgr.get_memory_current_mode().unwrap().register_statics(name, Box::new(res.clone()));
             }
             Err(_) => {}
         }
@@ -60,7 +60,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
             let mm= MemoryManager::get_memory_manager();
             match mm {
                 Ok(mut mgr) => {
-                    mgr.get_memory_mode().unwrap().update_statics(self.header.name, Box::new(self.clone()));
+                    mgr.get_memory_current_mode().unwrap().update_statics(self.header.name, Box::new(self.clone()));
                 }
                 Err(e) => {
                     return Err(e);
@@ -105,7 +105,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         };
         match mm {
             Ok(mut mgr) => {
-                mgr.get_memory_mode().unwrap().register_state(name, Box::new(res.clone())).unwrap();
+                mgr.get_memory_current_mode().unwrap().register_state(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -117,7 +117,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.get_memory_mode().unwrap().update_state(self.header.name, Box::new(self.clone()));
+                mgr.get_memory_current_mode().unwrap().update_state(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -171,7 +171,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Displ
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.get_memory_mode().unwrap().register_parameters(name, Box::new(res.clone())).unwrap();
+                mgr.get_memory_current_mode().unwrap().register_parameters(name, Box::new(res.clone())).unwrap();
             }
             Err(_) => {}
         }
@@ -194,7 +194,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Displ
         let mm= MemoryManager::get_memory_manager();
         match mm {
             Ok(mut mgr) => {
-                mgr.get_memory_mode().unwrap().update_parameters(self.header.name, Box::new(self.clone()));
+                mgr.get_memory_current_mode().unwrap().update_parameters(self.header.name, Box::new(self.clone()));
             }
             Err(e) => {
                 return Err(e);
@@ -305,14 +305,17 @@ impl MemoryManager {
     pub fn get_instance() -> &'static Mutex<MemoryManager> {
         MEMORY_MANAGER.get_or_init( || Mutex::new(MemoryManager::new()))
     }
-    pub fn new_mode(&mut self, index: usize) {
+    pub fn add_mode(&mut self, index: usize) {
         self.memory_modes.insert(index, MemoryMode::new());
     }
     pub fn set_mode(&mut self, index: usize) {
         self.current_mode_index = index;
     }
-    pub fn get_memory_mode(&mut self) -> Option<&mut MemoryMode> {
+    pub fn get_memory_current_mode(&mut self) -> Option<&mut MemoryMode> {
         self.memory_modes.get_mut(&self.current_mode_index)
+    }
+    pub fn get_memory_mode(&mut self, index: usize) -> Option<&mut MemoryMode> {
+        self.memory_modes.get_mut(&index)
     }
 }
 

@@ -130,6 +130,7 @@ impl ProcessorManager {
     pub fn add_mode(&mut self, mode: ProcessorMode) {
         let index = self.modes.len();
         self.modes.insert(index, mode);
+        MemoryManager::get_memory_manager().unwrap().add_mode(index);
     }
     pub fn switch_mode(&mut self, index: usize) -> Result<(), String> {
         if self.current_mode_index == index {
