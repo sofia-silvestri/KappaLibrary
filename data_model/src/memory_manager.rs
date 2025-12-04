@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::any::Any;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
-use std::fmt::Display;
+use std::fmt::Debug;
 
 use memory_var_macro::MemoryVarMacro;
 use crate::streaming_data::StreamingError;
@@ -25,7 +25,7 @@ pub trait StaticsTrait : Send + Sync + DataTrait {
 }
 
 #[derive(MemoryVarMacro, Clone)]
-pub struct Statics<T: 'static + Sync + Send + Display> {
+pub struct Statics<T: 'static + Sync + Send + Debug> {
     pub header: DataHeader,
     value: T,
     limits: Option<[T; 2]>,
@@ -34,7 +34,7 @@ pub struct Statics<T: 'static + Sync + Send + Display> {
 }
 
 impl<T> Statics<T> 
-where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
+where T: 'static + Sync + Send + PartialOrd + PartialEq + Debug + Clone
 {
     pub fn new(name: &'static str, value: T, limits: Option<[T; 2]>) -> Self {
         let mm= MemoryManager::get_memory_manager();
@@ -78,7 +78,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Display + Clone
 }
 
 impl<T> StaticsTrait for Statics<T> 
-where T: 'static + Sync + Send + Display
+where T: 'static + Sync + Send + Debug
 {
     fn is_settable(&self) -> bool {
         self.settable
@@ -86,14 +86,14 @@ where T: 'static + Sync + Send + Display
 }
 
 #[derive(MemoryVarMacro)]
-pub struct State<T: 'static +Send + Sync + Display> {
+pub struct State<T: 'static +Send + Sync + Debug> {
     pub header: DataHeader,
     value: T,
     senders: Vec<SyncSender<T>>,
     lock: Arc<Mutex<()>>,
 }
 
-impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq + Display
+impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq + Debug
 {
     pub fn new(name: &'static str, value: T) -> Self {
         let mm= MemoryManager::get_memory_manager();
@@ -138,7 +138,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         }
     }
 }
-impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Display{
+impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Debug{
     fn clone(&self) -> Self {
         Self {
             header: DataHeader{name: self.header.name},
@@ -150,7 +150,7 @@ impl<T> Clone for State<T> where T: 'static + Send + Sync + Clone + Display{
 }
 
 #[derive(MemoryVarMacro)]
-pub struct Parameter<T:'static + Send + Sync + Clone + Display> {
+pub struct Parameter<T:'static + Send + Sync + Clone + Debug> {
     pub header: DataHeader,
     pub value: T,
     pub default: T,
@@ -158,7 +158,7 @@ pub struct Parameter<T:'static + Send + Sync + Clone + Display> {
     lock: Arc<Mutex<()>>,
 }
 
-impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Display{
+impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Debug{
     pub fn new(name: &'static str, value: T, limits: Option<[T; 2]>) -> Self {
         let default = value.clone();
         let res = Self {
@@ -204,7 +204,7 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Displ
     }
 }
 
-impl<T> Clone for Parameter<T> where T: Send + Sync + Clone + Display {
+impl<T> Clone for Parameter<T> where T: Send + Sync + Clone + Debug {
     fn clone(&self) -> Self {
         Self {
             header: DataHeader{name: self.header.name},

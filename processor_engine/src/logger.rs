@@ -5,7 +5,7 @@ use std::thread;
 use std::process::Command;
 use std::fs;
 use std::path::Path;
-use std::fmt::Display;
+use std::fmt::Debug;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex, OnceLock};
 use chrono::prelude::*;
@@ -26,12 +26,6 @@ pub enum LogLevel {
     Notice,
     Info,
     Debug,
-}
-
-impl Display for LogLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 #[repr(C)]
