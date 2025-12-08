@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 
-
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Matrix<T> {
-    data: Vec<Vec<T>>,
-    rows: usize,
-    cols: usize,
+    pub data: Vec<Vec<T>>,
+    pub rows: usize,
+    pub cols: usize,
 }
 
 impl<T> Matrix<T>
