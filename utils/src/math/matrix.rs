@@ -238,6 +238,25 @@ where
         Matrix::from_vec(result_data)
     }
 }
+impl<T> std::ops::Add for &Matrix<T>
+where
+    T: Clone + std::ops::Add<Output = T> + std::default::Default,
+{
+    type Output = Matrix<T>;
+
+    fn add(self, other: &Matrix<T>) -> Matrix<T> {
+        if self.rows != other.rows || self.cols != other.cols {
+            panic!("Matrix dimensions must agree for addition");
+        }
+        let mut result_data = vec![vec![T::default(); self.cols]; self.rows];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                result_data[i][j] = self.data[i][j].clone() + other.data[i][j].clone();
+            }
+        }
+        Matrix::from_vec(result_data)
+    }
+}
 
 impl<T> std::ops::Sub for Matrix<T>
 where
@@ -258,7 +277,25 @@ where
         Matrix::from_vec(result_data)
     }
 }
+impl<T> std::ops::Sub for &Matrix<T>
+where
+    T: Clone + std::ops::Sub<Output = T> + std::default::Default,
+{
+    type Output = Matrix<T>;
 
+    fn sub(self, other: &Matrix<T>) -> Matrix<T> {
+        if self.rows != other.rows || self.cols != other.cols {
+            panic!("Matrix dimensions must agree for subtraction");
+        }
+        let mut result_data = vec![vec![T::default(); self.cols]; self.rows];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                result_data[i][j] = self.data[i][j].clone() - other.data[i][j].clone();
+            }
+        }
+        Matrix::from_vec(result_data)
+    }
+}
 impl<T> std::ops::Mul for Matrix<T>
 where
     T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
@@ -281,7 +318,28 @@ where
         Matrix::from_vec(result_data)
     }
 }
+impl<T> std::ops::Mul for &Matrix<T>
+where
+    T: Clone + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T>,
+{
+    type Output = Matrix<T>;
 
+    fn mul(self, other: &Matrix<T>) -> Matrix<T> {
+        if self.cols != other.rows {
+            panic!("Matrix dimensions must agree for multiplication");
+        }
+        let mut result_data = vec![vec![T::default(); other.cols]; self.rows];
+        for i in 0..self.rows {
+            for j in 0..other.cols {
+                for k in 0..self.cols {
+                    result_data[i][j] = result_data[i][j].clone()
+                        + (self.data[i][k].clone() * other.data[k][j].clone());
+                }
+            }
+        }
+        Matrix::from_vec(result_data)
+    }
+}
 impl<T> std::ops::Div for Matrix<T>
 where
     T: Clone + std::ops::Div<Output = T> + std::default::Default + PartialEq + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + std::ops::Mul<Output = T> + From<u8>,
@@ -294,6 +352,24 @@ where
         }
         if let Some(other_inverse) = other.inverse() {
             let result_data = self * other_inverse;
+            Matrix::from_vec(result_data.to_vec())
+        } else {
+            panic!("Matrix is singular, cannot divide");
+        }
+    }
+}
+impl<T> std::ops::Div for &Matrix<T>
+where
+    T: Clone + std::ops::Div<Output = T> + std::default::Default + PartialEq + std::ops::Add<Output = T> + std::ops::Sub<Output = T> + std::ops::Mul<Output = T> + From<u8>,
+{
+    type Output = Matrix<T>;
+
+    fn div(self, other: &Matrix<T>) -> Matrix<T> {
+        if self.cols != other.rows {
+            panic!("Matrix dimensions must agree for division");
+        }
+        if let Some(other_inverse) = other.inverse() {
+            let result_data = self * &other_inverse;
             Matrix::from_vec(result_data.to_vec())
         } else {
             panic!("Matrix is singular, cannot divide");
