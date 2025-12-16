@@ -84,113 +84,113 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
         }
         impl #impl_generics StreamBlock for #name #ty_generics #where_clause
         {
-            fn new_input<V: 'static + Send + Clone>(&mut self, key: &'static str) -> Result<(), StreamingError> {
+            fn new_input<V: 'static + Send + Clone>(&mut self, key: &'static str) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.inputs.contains_key(qualified_name) {
-                    return Err(StreamingError::AlreadyDefined);
+                    return Err(StreamErrCode::AlreadyDefined);
                 }
                 self.inputs.insert(qualified_name, Box::new(Input::<V>::new(qualified_name)));
                 Ok(())
             }
-            fn new_output<V: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError> {
+            fn new_output<V: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.outputs.contains_key(qualified_name) {
-                    return Err(StreamingError::AlreadyDefined);
+                    return Err(StreamErrCode::AlreadyDefined);
                 }
                 self.outputs.insert(qualified_name, Box::new(Output::<V>::new(qualified_name)));
                 Ok(())
             }
-            fn new_state<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: V,) -> Result<(), StreamingError> {
+            fn new_state<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: V,) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.state.contains_key(qualified_name) {
-                    return Err(StreamingError::AlreadyDefined);
+                    return Err(StreamErrCode::AlreadyDefined);
                 }
                 self.state.insert(qualified_name, Box::new(State::<V>::new(qualified_name, value)));
                 Ok(())
             }
-            fn new_parameter<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamingError> {
+            fn new_parameter<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.parameters.contains_key(qualified_name) {
-                    return Err(StreamingError::AlreadyDefined);
+                    return Err(StreamErrCode::AlreadyDefined);
                 }
                 self.parameters.insert(qualified_name, Box::new(Parameter::<V>::new(qualified_name, value, limits)));
                 Ok(())
             }
-            fn new_statics<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + PartialEq+Debug> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamingError> {
+            fn new_statics<V: 'static + Send + Sync + Clone + Serialize + PartialOrd + PartialEq+Debug> (&mut self, key: &'static str, value: V, limits: Option<[V;2]>) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if self.statics.contains_key(qualified_name) {
-                    return Err(StreamingError::AlreadyDefined);
+                    return Err(StreamErrCode::AlreadyDefined);
                 }
                 self.statics.insert(qualified_name, Box::new(Statics::<V>::new(qualified_name, value, limits)));
                 Ok(())
             }
-            fn get_input<V: Send+Clone> (&self, key: &str) -> Result<&Input<V>, StreamingError> {
+            fn get_input<V: Send+Clone> (&self, key: &str) -> Result<&Input<V>, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.inputs.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(input_container) = any_ref.downcast_ref::<Input<V>>() {
                         Ok(input_container)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidInput)
+                    Err(StreamErrCode::InvalidInput)
                 }
             }
-            fn get_output<V: Send+Clone> (&self, key: &str) -> Result<&Output<V>, StreamingError> {
+            fn get_output<V: Send+Clone> (&self, key: &str) -> Result<&Output<V>, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.outputs.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(output_container) = any_ref.downcast_ref::<Output<V>>() {
                         Ok(output_container)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidOutput)
+                    Err(StreamErrCode::InvalidOutput)
                 }
             }
-            fn get_parameter<V : 'static + Send + Sync + Clone + Debug> (&self, key: &str) -> Result<&Parameter<V>, StreamingError> {
+            fn get_parameter<V : 'static + Send + Sync + Clone + Debug> (&self, key: &str) -> Result<&Parameter<V>, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.parameters.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(param) = any_ref.downcast_ref::<Parameter<V>>() {
                         Ok(param)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn get_statics<V: 'static + Send + Sync + Debug> (&self, key: &str) -> Result<&Statics<V>, StreamingError> {
+            fn get_statics<V: 'static + Send + Sync + Debug> (&self, key: &str) -> Result<&Statics<V>, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.statics.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(statics) = any_ref.downcast_ref::<Statics<V>>() {
                         Ok(statics)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidStatics)
+                    Err(StreamErrCode::InvalidStatics)
                 }
             }
 
-            fn get_input_channel<V: 'static + Send + Any + Clone>(&self, key: &str) -> Result<SyncSender<V>, StreamingError> {
+            fn get_input_channel<V: 'static + Send + Any + Clone>(&self, key: &str) -> Result<SyncSender<V>, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.inputs.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(input_container) = any_ref.downcast_ref::<Input<V>>() {
                         Ok(input_container.sender.clone())
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidInput)
+                    Err(StreamErrCode::InvalidInput)
                 }
             }
-            fn connect<V: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<V>) -> Result<(), StreamingError> {
+            fn connect<V: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<V>) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.outputs.get_mut(qualified_name) {
                     let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
@@ -198,52 +198,65 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                         output.connect(sender);
                         Ok(())
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidOutput)
+                    Err(StreamErrCode::InvalidOutput)
                 }
             }
-            fn get_parameter_value<V:'static + Send + PartialOrd + Clone + Serialize + Sync + Debug>(&self, key: &str) -> Result<V, StreamingError> {
+            fn get_parameter_value<V:'static + Send + PartialOrd + Clone + Serialize + Sync + Debug>(&self, key: &str) -> Result<V, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.parameters.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(param) = any_ref.downcast_ref::<Parameter<V>>() {
                         Ok(param.get_value())
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn set_parameter_value<V:'static + Send + PartialOrd + Clone + Serialize + Sync + Debug>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn set_parameter_value<V:'static + Send + PartialOrd + Clone + Serialize + Sync + Debug>(&mut self, key: &str, value: V) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.parameters.get_mut(qualified_name) {
                     let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
                     if let Some(param) = any_mut.downcast_mut::<Parameter<V>>() {
                         param.set_value(value)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn set_statics_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn set_statics_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: V) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.statics.get_mut(qualified_name) {
                     let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
                     if let Some(statics) = any_mut.downcast_mut::<Statics<V>>() {
                         statics.set_value(value)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn set_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn get_statics_value<V:'static + Send + PartialOrd + Clone + Serialize + Sync + Debug>(&self, key: &str) -> Result<V, StreamErrCode> {
+                let qualified_name: &'static str = Self::get_qualified_name(self, key);
+                if let Some(container) = self.statics.get(qualified_name) {
+                    let any_ref: &dyn Any = container.as_ref().as_any();
+                    if let Some(statics) = any_ref.downcast_ref::<Statics<V>>() {
+                        Ok(statics.get_value())
+                    } else {
+                        Err(StreamErrCode::WrongType)
+                    }
+                } else {
+                    Err(StreamErrCode::InvalidParameter)
+                }
+            }
+            fn set_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: V) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.state.get_mut(qualified_name) {
                     let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
@@ -251,49 +264,49 @@ pub fn stream_processor_macro_derive(input: TokenStream) -> TokenStream {
                         state.set_value(value);
                         Ok(())
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn get_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str) -> Result<V, StreamingError> {
+            fn get_state_value<V:'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&self, key: &str) -> Result<V, StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
-                if let Some(container) = self.state.get_mut(qualified_name) {
-                    let any_mut: &mut dyn Any = container.as_mut().as_any_mut();
-                    if let Some(state) = any_mut.downcast_mut::<State<V>>() {
+                if let Some(container) = self.state.get(qualified_name) {
+                    let any_ref: &dyn Any = container.as_ref().as_any();
+                    if let Some(state) = any_ref.downcast_ref::<State<V>>() {
                         Ok(state.get_value())
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidParameter)
+                    Err(StreamErrCode::InvalidParameter)
                 }
             }
-            fn recv_input<V: 'static + Send+Clone> (&mut self, key: &str) -> Result<V , StreamingError> {
+            fn recv_input<V: 'static + Send+Clone> (&mut self, key: &str) -> Result<V , StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.inputs.get_mut(qualified_name) {
                     let any_ref : &mut dyn Any = container.as_mut().as_any_mut(); 
                     if let Some(input_container) = any_ref.downcast_mut :: < Input < V >> () { 
                         input_container.recv() 
                     } else { 
-                        Err(StreamingError :: WrongType) 
+                        Err(StreamErrCode :: WrongType) 
                     }
                 } else { 
-                    Err(StreamingError :: InvalidInput) 
+                    Err(StreamErrCode :: InvalidInput) 
                 }
             }
-            fn send_output<V:'static + Send+Clone> (&self, key: &str, value: V) -> Result<(), StreamingError> {
+            fn send_output<V:'static + Send+Clone> (&self, key: &str, value: V) -> Result<(), StreamErrCode> {
                 let qualified_name: &'static str = Self::get_qualified_name(self, key);
                 if let Some(container) = self.outputs.get(qualified_name) {
                     let any_ref: &dyn Any = container.as_ref().as_any();
                     if let Some(output_container) = any_ref.downcast_ref::<Output<V>>() {
                         output_container.send(value)
                     } else {
-                        Err(StreamingError::WrongType)
+                        Err(StreamErrCode::WrongType)
                     }
                 } else {
-                    Err(StreamingError::InvalidOutput)
+                    Err(StreamErrCode::InvalidOutput)
                 }
             }
         }

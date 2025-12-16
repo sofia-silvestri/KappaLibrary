@@ -1,18 +1,4 @@
 #[derive(Debug, PartialEq)]
-
-#[repr(C)]
-pub struct TaskStatistics {
-    pub timestamp: f64,
-    pub mean: f64,
-    pub max: f64,
-    pub min: f64,
-    pub std_dev: f64,
-    pub p50: f64,
-    pub p90: f64,
-    pub p99: f64,
-}
-
-#[derive(Debug, PartialEq)]
 pub enum StreamingState {
     Null,
     Initial,
@@ -27,7 +13,7 @@ impl std::fmt::Display for StreamingState {
 
 
 #[derive(Debug, PartialEq)]
-pub enum StreamingError {
+pub enum StreamErrCode {
     Ok,
     GenericError,
     AlreadyDefined,
@@ -50,9 +36,25 @@ pub enum StreamingError {
     WriteError,
     TaskError,
 }
-
-impl std::fmt::Display for StreamingError {
+impl std::fmt::Display for StreamErrCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+pub struct StreamingError {
+    pub code: StreamErrCode,
+    pub message: String,
+}
+impl StreamingError {
+    pub fn new(code: StreamErrCode, message: &str) -> Self {
+        StreamingError {
+            code,
+            message: message.to_string(),
+        }
+    }
+}
+impl std::fmt::Display for StreamingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error {:?}: {}", self.code, self.message)
     }
 }

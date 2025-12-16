@@ -5,32 +5,33 @@ use std::sync::mpsc::SyncSender;
 use std::thread;
 use std::time::Duration;
 
-use crate::connectors::{Input, Output};
+use data_model::connectors::{Input, Output};
 use data_model::memory_manager::Statics;
 use data_model::memory_manager::Parameter;
-use data_model::streaming_data::{StreamingError, StreamingState};
+use data_model::streaming_data::{StreamErrCode, StreamingState};
 
 use serde::Serialize;
 
 pub trait StreamBlock {
-    fn new_input<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
-    fn new_output<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamingError>;
-    fn new_state<T: 'static + Send + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: T) -> Result<(), StreamingError>;
-    fn new_parameter<T: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
-    fn new_statics<T: 'static + Send + Sync + Clone + Serialize + PartialEq + PartialOrd+ Debug> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamingError>;
-    fn get_input<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Input<T>, StreamingError>;
-    fn get_output<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Output<T>, StreamingError>;
-    fn get_parameter<T: 'static + Send + Sync + Clone + Debug> (&self, key: &str) -> Result<&Parameter<T>, StreamingError>;
-    fn get_statics<T: 'static + Send + Sync + Debug> (&self, key: &str) -> Result<&Statics<T>, StreamingError>;
-    fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<SyncSender<T>, StreamingError>;
-    fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<T>) -> Result<(), StreamingError>;
-    fn get_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+Debug>(&self, key: &str) -> Result<T, StreamingError>;
-    fn set_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+ Debug>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
-    fn set_statics_value<T: 'static + Send + Clone + Serialize + Sync + Debug + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
-    fn get_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str) -> Result<T, StreamingError>;
-    fn set_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: T) -> Result<(), StreamingError>;
-    fn recv_input<T: 'static + Send+Clone> (&mut self, key: &str) -> Result<T, StreamingError>;
-    fn send_output<T: 'static +  Send+Clone> (&self, key: &str, value: T) -> Result<(), StreamingError>;
+    fn new_input<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamErrCode>;
+    fn new_output<T: 'static + Send + Clone> (&mut self, key: &'static str) -> Result<(), StreamErrCode>;
+    fn new_state<T: 'static + Send + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: T) -> Result<(), StreamErrCode>;
+    fn new_parameter<T: 'static + Send + Sync + Clone + Serialize + PartialOrd + Debug> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamErrCode>;
+    fn new_statics<T: 'static + Send + Sync + Clone + Serialize + PartialEq + PartialOrd+ Debug> (&mut self, key: &'static str, value: T, limits: Option<[T; 2]>) -> Result<(), StreamErrCode>;
+    fn get_input<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Input<T>, StreamErrCode>;
+    fn get_output<T: 'static + Send + Clone> (&self, key: &str) -> Result<&Output<T>, StreamErrCode>;
+    fn get_parameter<T: 'static + Send + Sync + Clone + Debug> (&self, key: &str) -> Result<&Parameter<T>, StreamErrCode>;
+    fn get_statics<T: 'static + Send + Sync + Debug> (&self, key: &str) -> Result<&Statics<T>, StreamErrCode>;
+    fn get_input_channel<T: 'static + Send + Any + Clone>(&self, key: &str) -> Result<SyncSender<T>, StreamErrCode>;
+    fn connect<T: 'static + Send + Any + Clone>(&mut self, key: &str, sender: SyncSender<T>) -> Result<(), StreamErrCode>;
+    fn set_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+ Debug>(&mut self, key: &str, value: T) -> Result<(), StreamErrCode>;
+    fn get_parameter_value<T: 'static + Send + Clone + PartialOrd + Clone + Serialize + Sync+Debug>(&self, key: &str) -> Result<T, StreamErrCode>;
+    fn set_statics_value<T: 'static + Send + Clone + Serialize + Sync + Debug + PartialOrd + PartialEq>(&mut self, key: &str, value: T) -> Result<(), StreamErrCode>;
+    fn get_statics_value<T: 'static + Send + Clone + Serialize + Sync + Debug + PartialOrd + PartialEq>(&self, key: &str) -> Result<T, StreamErrCode>;
+    fn set_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&mut self, key: &str, value: T) -> Result<(), StreamErrCode>;
+    fn get_state_value<T: 'static + Send + Clone + Serialize + Sync + PartialOrd + PartialEq+Debug>(&self, key: &str) -> Result<T, StreamErrCode>;
+    fn recv_input<T: 'static + Send+Clone> (&mut self, key: &str) -> Result<T, StreamErrCode>;
+    fn send_output<T: 'static +  Send+Clone> (&self, key: &str, value: T) -> Result<(), StreamErrCode>;
 }
 
 pub trait StreamBlockDyn : Send {
@@ -47,19 +48,19 @@ pub trait StreamBlockDyn : Send {
 }
 
 pub trait StreamProcessor: StreamBlockDyn {
-    fn init(&mut self) -> Result<(), StreamingError >{
+    fn init(&mut self) -> Result<(), StreamErrCode >{
         if self.check_state(StreamingState::Running) {
-            return Err(StreamingError::InvalidStateTransition)
+            return Err(StreamErrCode::InvalidStateTransition)
         }
         if !self.is_initialized() {
-            return Err(StreamingError::InvalidStatics)
+            return Err(StreamErrCode::InvalidStatics)
         }
         self.set_state(StreamingState::Initial);
         Ok(())
     }
-    fn run(&mut self) -> Result<(), StreamingError >{
+    fn run(&mut self) -> Result<(), StreamErrCode >{
         if self.check_state(StreamingState::Stopped) {
-            return Err(StreamingError::InvalidStateTransition);
+            return Err(StreamErrCode::InvalidStateTransition);
         }
         self.set_state(StreamingState::Running);
 
@@ -68,16 +69,16 @@ pub trait StreamProcessor: StreamBlockDyn {
         }
         Ok(())
     }
-    fn process(&mut self) -> Result<(), StreamingError >{
+    fn process(&mut self) -> Result<(), StreamErrCode >{
         thread::sleep(Duration::from_millis(100));
         Ok(())
     }
-    fn stop(&mut self) -> Result<(), StreamingError > {
+    fn stop(&mut self) -> Result<(), StreamErrCode > {
         self.set_state(StreamingState::Stopped);
         Ok(())
     }
-    fn execute_command(&mut self, command: &str, args: Vec<&str>) -> Result<String, StreamingError> {
-        Err(StreamingError::InvalidOperation)
+    fn execute_command(&mut self, command: &str, args: Vec<&str>) -> Result<String, StreamErrCode> {
+        Err(StreamErrCode::InvalidOperation)
     }
 }
 
@@ -107,7 +108,7 @@ mod test {
         let mut test_block = TestBlock::new("test");
         let res = test_block.init();
         assert!(res.is_err());
-        assert_eq!(res.err(), Some(StreamingError::InvalidStatics));
+        assert_eq!(res.err(), Some(StreamErrCode::InvalidStatics));
         let res = test_block.set_statics_value("sum_value", 5);
         assert!(res.is_ok());
         assert!(test_block.init().is_ok());

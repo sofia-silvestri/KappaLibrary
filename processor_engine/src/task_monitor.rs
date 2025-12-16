@@ -3,7 +3,7 @@ use std::sync::{Mutex, OnceLock, Arc};
 use std::thread::{self, JoinHandle};
 use std::fmt;
 use chrono::{DateTime, Utc};
-use data_model::streaming_data::StreamingError;
+use data_model::streaming_data::StreamErrCode;
 use libc::{clock_gettime, clockid_t, pthread_getcpuclockid, pthread_self, pthread_t, timespec};
 use utils::math::statistics::{mean, std_deviation, percentile};
 
@@ -51,13 +51,13 @@ impl Task {
             last_update: Utc::now(),
         }
     }
-    pub fn update(&mut self) -> Result<(), StreamingError> {
+    pub fn update(&mut self) -> Result<(), StreamErrCode> {
         let mut occupacy: f64 = 0.0;
         unsafe {
             let mut ts: timespec = timespec { tv_sec: 0, tv_nsec: 0 };
             let ts_ptr: *mut timespec = &mut ts as *mut timespec;
             if clock_gettime(self.cpu_clock_id, ts_ptr) != 0 {
-                return Err(StreamingError::TaskError);
+                return Err(StreamErrCode::TaskError);
             }
             if self.last_cpu_time == 0.0 {
                 self.last_cpu_time = utils::time::timespec_to_f64(&ts);
@@ -83,6 +83,7 @@ impl Task {
     pub fn get_stats(&self) -> TaskStatistics {
         let timestamp = Utc::now();
         let mut data: Vec<f64> = self.occupacy.iter().cloned().collect();
+        data.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mean = mean::<f64>(data.clone());
         let max = *data.last().unwrap_or(&0.0);
         let min = *data.first().unwrap_or(&0.0);

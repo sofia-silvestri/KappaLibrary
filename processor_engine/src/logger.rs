@@ -11,10 +11,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 use chrono::prelude::*;
 use serde::Serialize;
 use stream_proc_macro::{StreamBlockMacro};
-use data_model::streaming_data::{StreamingError, StreamingState};
+use data_model::streaming_data::{StreamErrCode, StreamingState};
 use data_model::memory_manager::{DataTrait, StaticsTrait, State, Parameter, Statics};
 use crate::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
-use crate::connectors::{ConnectorTrait, Input, Output};
+use data_model::connectors::{ConnectorTrait, Input, Output};
 
 #[derive(Debug, Clone, PartialOrd, PartialEq, Copy, Serialize)]
 pub enum LogLevel {
@@ -144,7 +144,7 @@ impl Logger {
 
 impl StreamProcessor for Logger {
     // Implementazione dei metodi del trait StreamProcessor
-    fn init(&mut self) -> Result<(), StreamingError> {
+    fn init(&mut self) -> Result<(), StreamErrCode> {
         // Implementazione specifica per Logger
         let ret = self.get_parameter_value::<&'static str>("log_file_path");
         let binding: &'static str;
@@ -152,7 +152,7 @@ impl StreamProcessor for Logger {
             Ok(b) => {binding = b;},
             Err(_) => {
                 self.set_state(StreamingState::Stopped);
-                return Err(StreamingError::GenericError);
+                return Err(StreamErrCode::GenericError);
             }
         }
         let path = Path::new(binding);
@@ -162,21 +162,21 @@ impl StreamProcessor for Logger {
                 Ok(_) => {}
                 Err(_) => {
                     self.set_state(StreamingState::Stopped);
-                    return Err(StreamingError::CreateError);
+                    return Err(StreamErrCode::CreateError);
                 }
             }
         } else {
             if !path.is_dir() {
                 self.set_state(StreamingState::Stopped);
-                return Err(StreamingError::PathError);
+                return Err(StreamErrCode::PathError);
             }
         }
         self.set_state(StreamingState::Initial);
         Ok(())
     }
 
-    fn run(&mut self) -> Result<(), StreamingError> {
-        self.start_log_file().map_err(|_| StreamingError::CreateError)?;
+    fn run(&mut self) -> Result<(), StreamErrCode> {
+        self.start_log_file().map_err(|_| StreamErrCode::CreateError)?;
         self.set_state(StreamingState::Running);
         self.log_time_start = Utc::now();
         while self.check_state(StreamingState::Running) {
@@ -185,7 +185,7 @@ impl StreamProcessor for Logger {
         Ok(())
     }
 
-    fn process(&mut self) -> Result<(), StreamingError> {
+    fn process(&mut self) -> Result<(), StreamErrCode> {
         let mut error: bool = false; 
         let input = self.recv_input::<LogEntry>("log_entry");
         match input {
@@ -209,7 +209,7 @@ impl StreamProcessor for Logger {
                 let _ = self.send_output::<LogEntry>("log_redirect", log_entry.clone());
                 if error {
                     self.set_state(StreamingState::Stopped);
-                    return Err(StreamingError::WriteError);
+                    return Err(StreamErrCode::WriteError);
 
                 } else {
                     return Ok(());
@@ -218,7 +218,7 @@ impl StreamProcessor for Logger {
             Err(e) => {return Err(e);}
         }
     }
-    fn stop(&mut self) -> Result<(), StreamingError> {
+    fn stop(&mut self) -> Result<(), StreamErrCode> {
         self.set_state(StreamingState::Stopped);
         thread::sleep(std::time::Duration::from_secs(1));
         Ok(())

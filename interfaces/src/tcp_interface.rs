@@ -11,10 +11,10 @@ use processor_engine::logger::{LogLevel, Logger};
 use processor_engine::task_monitor::TaskManager;
 use serde::Serialize;
 use stream_proc_macro::{StreamBlockMacro};
-use data_model::streaming_data::{StreamingError, StreamingState};
+use data_model::streaming_data::{StreamErrCode, StreamingState};
 use data_model::memory_manager::{DataTrait, StaticsTrait, State, Parameter, Statics};
 use processor_engine::stream_processor::{StreamBlock, StreamBlockDyn, StreamProcessor};
-use processor_engine::connectors::{ConnectorTrait, Input, Output};
+use data_model::connectors::{ConnectorTrait, Input, Output};
 use processor_engine::logger::LogEntry;
 use std::net::{TcpListener, TcpStream};
 use std::mem;
@@ -45,7 +45,7 @@ pub fn as_byte<T>(value: &T) -> &[u8] {
         )
     }
 }
-pub unsafe fn from_bytes<T: 'static>(data: &[u8]) -> Result<&T, StreamingError> {
+pub unsafe fn from_bytes<T: 'static>(data: &[u8]) -> Result<&T, StreamErrCode> {
     if TypeId::of::<T>() == TypeId::of::<String>() {
         let string = String::from_utf8_lossy(data).into_owned();
         return Ok(unsafe {&*(Box::leak(Box::new(string)) as *mut String as *mut T)});
@@ -59,7 +59,7 @@ pub unsafe fn from_bytes<T: 'static>(data: &[u8]) -> Result<&T, StreamingError> 
     }
     if data.len() != mem::size_of::<T>() {
         eprintln!("Wrong slice dimension!");
-        return Err(StreamingError::InvalidInput);
+        return Err(StreamErrCode::InvalidInput);
     }
     let ptr = data.as_ptr();
     let ptr_t: *const T = ptr as *const T;
@@ -93,30 +93,30 @@ where
 impl<T> StreamProcessor for TcpSender<T> 
 where T: 'static + Send + Clone
 {
-    fn init(&mut self) -> Result<(), StreamingError > {
+    fn init(&mut self) -> Result<(), StreamErrCode > {
         if self.check_state(StreamingState::Running) {
             self.set_state(StreamingState::Stopped);
-            return  Err(StreamingError::InvalidStateTransition);
+            return  Err(StreamErrCode::InvalidStateTransition);
         }
         if !self.is_initialized() {
-            return  Err(StreamingError::InvalidStatics);
+            return  Err(StreamErrCode::InvalidStatics);
         }
-        let port = self.get_statics::<u16>("port").expect("").get_value();
-        let address = self.get_statics::<String>("address").expect("").get_value();
+        let port = self.get_statics_value::<u16>("port").expect("");
+        let address = self.get_statics_value::<String>("address").expect("");
         match TcpStream::connect(format!("{}:{}", address, port)) {
             Ok(tcp_stream) => {self.tcp_stream = Some(tcp_stream);}
             Err(_) => {
                 self.set_state(StreamingState::Stopped);
-                return Err(StreamingError::SendDataError);
+                return Err(StreamErrCode::SendDataError);
             }
         }
         self.set_state(StreamingState::Initial);
         Ok(())
     }
-    fn process(&mut self) -> Result<(), StreamingError> {
+    fn process(&mut self) -> Result<(), StreamErrCode> {
         if self.tcp_stream.is_none() {
             self.set_state(StreamingState::Stopped);
-            return Err(StreamingError::SendDataError);
+            return Err(StreamErrCode::SendDataError);
         }
         match self.recv_input::<T>("input") {
             Ok(input) => {
@@ -142,7 +142,7 @@ where T: 'static + Send + Clone
                 }                
                 if error_send {
                     self.set_state(StreamingState::Stopped);
-                    return Err(StreamingError::SendDataError);
+                    return Err(StreamErrCode::SendDataError);
                 }
             }
             Err(e) => {return Err(e);}
@@ -237,31 +237,31 @@ where
 impl<T> StreamProcessor for TcpReceiver<T> 
 where T: 'static + Send + Clone
 {
-    fn init(&mut self) -> Result<(), StreamingError > {
+    fn init(&mut self) -> Result<(), StreamErrCode > {
         if self.check_state(StreamingState::Running) {
             self.set_state(StreamingState::Stopped);
-            return  Err(StreamingError::InvalidStateTransition);
+            return  Err(StreamErrCode::InvalidStateTransition);
         }
         if !self.is_initialized() {
-            return  Err(StreamingError::InvalidStatics);
+            return  Err(StreamErrCode::InvalidStatics);
         }
-        let port = self.get_statics::<u16>("port").expect("").get_value();
-        let address = self.get_statics::<String>("address").expect("").get_value();
+        let port = self.get_statics_value::<u16>("port").expect("");
+        let address = self.get_statics_value::<String>("address").expect("");
         match TcpListener::bind(format!("{}:{}", address, port)) {
             Ok(tcp_listen) => {self.tcp_listen = Some(tcp_listen);}
             Err(_) => {
                 self.set_state(StreamingState::Stopped);
-                return Err(StreamingError::SendDataError);
+                return Err(StreamErrCode::SendDataError);
             }
         }
         self.set_state(StreamingState::Initial);
         Ok(())
     }
-    fn run(&mut self) -> Result<(), StreamingError> {
+    fn run(&mut self) -> Result<(), StreamErrCode> {
         self.set_state(StreamingState::Running);
         if self.tcp_listen.is_none() {
             self.set_state(StreamingState::Stopped);
-            return Err(StreamingError::SendDataError);
+            return Err(StreamErrCode::SendDataError);
         }
         let mut counter_stream: u32 = 0;
         for stream in self.tcp_listen.as_ref().unwrap().incoming() {
@@ -289,8 +289,8 @@ where T: 'static + Send + Clone
         }
         Ok(())
     }
-    fn process(&mut self) -> Result<(), StreamingError > {
-        let input: Result<TcpMessage<T>, StreamingError> = self.recv_input::<TcpMessage<T>>("response");
+    fn process(&mut self) -> Result<(), StreamErrCode > {
+        let input: Result<TcpMessage<T>, StreamErrCode> = self.recv_input::<TcpMessage<T>>("response");
         match input {
             Ok (message) => {
                 if let Some(mut stream) = self.tcp_stream.get(&message.id_stream) {
@@ -301,7 +301,7 @@ where T: 'static + Send + Clone
         }
         Ok(())
     }
-    fn stop(&mut self) -> Result<(), StreamingError > {
+    fn stop(&mut self) -> Result<(), StreamErrCode > {
         THREAD_EXIT.get_or_init(|| Arc::new(Mutex::new(true)));
         for j in self.tcp_handle.drain(..) {
             let _ = j.join();

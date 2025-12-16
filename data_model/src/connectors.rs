@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::sync::mpsc::{SyncSender, Receiver};
-use data_model::memory_manager::DataHeader;
-use data_model::streaming_data::StreamingError;
+use crate::memory_manager::DataHeader;
+use crate::streaming_data::StreamErrCode;
 
 pub trait ConnectorTrait: Send {
     fn as_any(&self) -> &dyn Any;
@@ -26,20 +26,20 @@ where T: 'static + Send + Any + Clone
             receiver,
         }
     }
-    pub fn send(&mut self, data: T) -> Result<(), StreamingError>{
+    pub fn send(&mut self, data: T) -> Result<(), StreamErrCode>{
         let ret = self.sender.send(data);
         if ret.is_ok() {
             Ok(())
         } else {
-            Err(StreamingError::SendDataError)
+            Err(StreamErrCode::SendDataError)
         }
     }
-    pub fn recv(&mut self) -> Result<T, StreamingError>{
+    pub fn recv(&mut self) -> Result<T, StreamErrCode>{
         let ret = self.receiver.recv();
         if ret.is_ok() {
             Ok(ret.unwrap())
         } else {
-            Err(StreamingError::ReceiveDataError)
+            Err(StreamErrCode::ReceiveDataError)
         }
     }
 }
@@ -65,12 +65,12 @@ impl<T: 'static + Send + Any + Clone> Output<T> {
     pub fn connect(&mut self, sender: SyncSender<T>) {
         self.senders.push(sender);
     }
-    pub fn send(&self, data: T) -> Result<(), StreamingError>{
+    pub fn send(&self, data: T) -> Result<(), StreamErrCode>{
         for s in &self.senders {
             let res = s.send(data.clone());
             match res {
                 Ok(_) => {continue;},
-                Err(_) => {return Err(StreamingError::SendDataError);}
+                Err(_) => {return Err(StreamErrCode::SendDataError);}
             }
         }
         Ok(())

@@ -1,7 +1,6 @@
 use std::{ffi::*, mem};
-use data_model::{modules::{ModuleStruct,ModuleStructFFI}, streaming_data::StreamingError};
+use crate::{modules::{ModuleStruct,ModuleStructFFI}, streaming_data::StreamErrCode};
 use libloading::{Library, Symbol};
-use crate::stream_processor::StreamProcessor;
 
 #[repr(C)]
 pub struct FfiStrSlice {
@@ -20,7 +19,7 @@ pub struct ModuleHandle<'a> {
 }
 
 impl ModuleHandle<'static> {
-    pub fn new(library_path: String) -> Result<Self, StreamingError> {
+    pub fn new(library_path: String) -> Result<Self, StreamErrCode> {
         let library: &'static Library;
         match unsafe { Library::new(library_path)} {
             Ok(lib) => {
@@ -29,7 +28,7 @@ impl ModuleHandle<'static> {
             }
             Err(_) => {
                 eprintln!("Unable to find");
-                return Err(StreamingError::FileNotFound);
+                return Err(StreamErrCode::FileNotFound);
             }
         }
         let module_info: Symbol<*mut ModuleStructFFI>;
@@ -37,7 +36,7 @@ impl ModuleHandle<'static> {
             Ok(module) => {module_info = module;}
             Err(_) => {
                 eprintln!("Unable to find");
-                return Err(StreamingError::FileNotFound);
+                return Err(StreamErrCode::FileNotFound);
             }
         }
         let module = unsafe{**module_info}.into();
@@ -46,7 +45,7 @@ impl ModuleHandle<'static> {
             Ok(func) => {funct_ptr = func;}
             Err(_) => {
                 eprintln!("Unable to find");
-                return Err(StreamingError::FileNotFound);
+                return Err(StreamErrCode::FileNotFound);
             }
         }
         let handle = Self {
@@ -71,7 +70,7 @@ pub fn get_error_return(code: i32) -> TraitObjectRepr {
     }
 }
 // Funzione FFI per creare e restituire l'oggetto
-pub fn export_stream_processor(proc: Box<dyn StreamProcessor>) -> TraitObjectRepr {
+/*pub fn export_stream_processor(proc: Box<dyn StreamProcessor>) -> TraitObjectRepr {
     
     let ptr_fat: *mut dyn StreamProcessor = Box::into_raw(proc);
     
@@ -100,4 +99,4 @@ pub fn free_object(repr: TraitObjectRepr) {
         // Box::from_raw riprende la proprietà del Box originale e lo dealloca
         let _boxed_trait: Box<dyn StreamProcessor> = Box::from_raw(trait_heap_pointer);
     }
-}
+}*/

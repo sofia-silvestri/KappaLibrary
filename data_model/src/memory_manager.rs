@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::fmt::Debug;
 
 use memory_var_macro::MemoryVarMacro;
-use crate::streaming_data::StreamingError;
+use crate::streaming_data::StreamErrCode;
 
 // General traits for Statics, States and Parameters
 #[derive(Debug, Clone, Copy)]
@@ -53,7 +53,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Debug + Clone
         }
         res
     }
-    pub fn set_value(&mut self, value: T) -> Result<(), StreamingError> {
+    pub fn set_value(&mut self, value: T) -> Result<(), StreamErrCode> {
         let _locked = self.lock.lock().unwrap();
         if self.settable {
             self.value = value;
@@ -69,7 +69,7 @@ where T: 'static + Sync + Send + PartialOrd + PartialEq + Debug + Clone
             self.settable = false;
             Ok(())
         } else {
-            Err(StreamingError::InvalidOperation)
+            Err(StreamErrCode::InvalidOperation)
         }
     }
     pub fn get_value(&self) -> T {
@@ -111,7 +111,7 @@ impl<T> State<T> where T: 'static + Send + Sync + Clone + PartialOrd + PartialEq
         }
         res
     }
-    pub fn set_value(& mut self, value: T) -> Result<(), StreamingError> {
+    pub fn set_value(& mut self, value: T) -> Result<(), StreamErrCode> {
         let _locked = self.lock.lock().unwrap();
         self.value = value;
         let mm= MemoryManager::get_memory_manager();
@@ -183,10 +183,10 @@ impl<T> Parameter<T> where T:'static +  Send + Sync + Clone + PartialOrd + Debug
         self.value.clone()
 
     }
-    pub fn set_value(&mut self, value: T) -> Result<(), StreamingError> {
+    pub fn set_value(&mut self, value: T) -> Result<(), StreamErrCode> {
         if let Some(limits) = &self.limits {
             if value < limits[0] || value > limits[1] {
-                return Err(StreamingError::OutOfRange);
+                return Err(StreamErrCode::OutOfRange);
             }
         }
         let _locked = self.lock.lock().unwrap();
@@ -229,23 +229,23 @@ impl MemoryMode {
             mapped_parameters: HashMap::new(),
         }
     }
-    pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+    pub fn register_state(&mut self, key: &'static str, state: Box<dyn DataTrait>) -> Result<(), StreamErrCode> {
         if self.mapped_state.contains_key(key) {
-            return Err(StreamingError::AlreadyDefined);
+            return Err(StreamErrCode::AlreadyDefined);
         }
         self.mapped_state.insert(key, state);
         Ok(())
     }
-    pub fn register_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+    pub fn register_statics(&mut self, key: &'static str, statics: Box<dyn DataTrait>) -> Result<(), StreamErrCode> {
         if self.mapped_statics.contains_key(key) {
-            return Err(StreamingError::AlreadyDefined);
+            return Err(StreamErrCode::AlreadyDefined);
         }
         self.mapped_statics.insert(key, statics);
         Ok(())
     }
-    pub fn register_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) -> Result<(), StreamingError> {
+    pub fn register_parameters(&mut self, key: &'static str, param: Box<dyn DataTrait>) -> Result<(), StreamErrCode> {
         if self.mapped_parameters.contains_key(key) {
-            return Err(StreamingError::AlreadyDefined);
+            return Err(StreamErrCode::AlreadyDefined);
         }
         self.mapped_parameters.insert(key, param);
         Ok(())
@@ -295,11 +295,11 @@ impl MemoryManager {
             current_mode_index: 0,
         }
     }
-    pub fn get_memory_manager() -> Result<MutexGuard<'static, MemoryManager>, StreamingError> {
+    pub fn get_memory_manager() -> Result<MutexGuard<'static, MemoryManager>, StreamErrCode> {
         let manager = MemoryManager::get_instance();
         match manager.lock() {
             Ok(guard) => Ok(guard),
-            Err(_) => Err(StreamingError::GenericError),
+            Err(_) => Err(StreamErrCode::GenericError),
         }
     }
     pub fn get_instance() -> &'static Mutex<MemoryManager> {
