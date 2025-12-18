@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::mem;
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::JoinHandle;
 use processor_engine::log;
@@ -47,6 +47,75 @@ pub struct TcpMessage<T> {
     pub message: T,
 }
 
+pub struct TcpHandler<T> where T: 'static + Send + Clone {
+    pub stream_id: u32,
+    pub stream: TcpStream,
+    pub data_sender: Output<TcpMessage<T>>,
+    pub receiver: Receiver<TcpMessage<T>>,
+    pub sender: SyncSender<TcpMessage<T>>,
+}
+
+impl<T> TcpHandler<T> where T: 'static + Send + Clone {
+    pub fn new(stream_id: u32,
+                  stream: TcpStream,
+                  data_sender: Output<TcpMessage<T>>) -> Self 
+    where T: 'static + Send + Clone
+    {
+        let (sender, receiver) = std::sync::mpsc::sync_channel::<TcpMessage<T>>(100);
+        Self {
+            stream_id,
+            stream,
+            data_sender,
+            receiver,
+            sender,
+        }
+    }
+    pub fn get_sender(&self) -> SyncSender<TcpMessage<T>> 
+    where T: 'static + Send + Clone
+    {
+        self.sender.clone()
+    }
+    pub fn handle_stream(&mut self) -> Result<(), String> 
+    {
+        let mut buffer = [0; 65535];
+        match self.stream.read(&mut buffer) {
+            Ok(n) => {
+                let data = unsafe{from_bytes::<T>(&buffer[0..n])};
+                match data {
+                    Ok(data) => {
+                        let message = TcpMessage {
+                            id_stream: self.stream_id as u32,
+                            message: data.clone(),
+                        };
+                        let _ = self.data_sender.send(message);
+                        let recv_message = self.receiver.recv();
+                        match recv_message {
+                            Ok(msg) => {
+                                if self.stream.write_all(as_byte::<T>(&msg.message)).is_err() {
+                                    return Err("Server: write stream error".to_string());
+                                }   
+                                Ok(())
+                            }
+                            Err(_) => Err("Handler: receive message error".to_string()),
+                        }
+                    }
+                    Err(_) => {
+                        if self.stream.write_all("Invalid format\n".as_bytes()).is_err() {
+                            return Err("Server: write stream error".to_string());
+                        }
+                        Err(("Invalid data format received").to_string())
+                    }
+                }
+            }
+            Err(e) => {
+                Err(format!("Server: read stream error: {}", e))
+            }
+        }
+    }
+}
+
+unsafe impl<T> Sync for TcpHandler<T> where T: 'static + Send + Clone {}
+
 #[derive(StreamBlockMacro)]
 pub struct TcpReceiver<T: 'static + Send + Clone> {
     name:       &'static str,
@@ -57,10 +126,9 @@ pub struct TcpReceiver<T: 'static + Send + Clone> {
     state:      HashMap<&'static str, Box<dyn DataTrait>>,
     lock:       Arc<Mutex<()>>,
     proc_state: Arc<Mutex<StreamingState>>,
-    phantom:    PhantomData<T>,
-    pub logger:     Logger,
+    pub logger: Logger,
     tcp_listen: Option<TcpListener>,
-    tcp_stream: HashMap<u32, std::net::TcpStream>,
+    tcp_stream: HashMap<u32, Arc<Mutex<TcpHandler<T>>>>,
     tcp_handle: Vec<JoinHandle<()>>,
 }
 
@@ -78,7 +146,6 @@ where
             state: HashMap::new(),
             lock: Arc::new(Mutex::new(())),
             proc_state: Arc::new(Mutex::new(StreamingState::Null)),
-            phantom: PhantomData,
             logger: Logger::new(Some(name)),
             tcp_listen: None,
             tcp_stream: HashMap::new(),
@@ -90,38 +157,35 @@ where
         ret.new_statics::<String>("address", "0.0.0.0".to_string(), None).unwrap();
         ret
     }
-    pub fn handle_client(mut stream: TcpStream,
-                        stream_id: u32,
-                        sender: Output<TcpMessage<T>>) {
+    pub fn receiver_loop(handler: Arc<Mutex<TcpHandler<T>>>, logger_input: SyncSender<LogEntry>, name: &'static str) {
         loop {
-            let mut buffer = [0; 65535];
-            match stream.read(&mut buffer) {
-                Ok(n) => {
-                    let data = unsafe{from_bytes::<T>(&buffer[0..n])};
-                    match data {
-                        Ok(data) => {
-                            let message = TcpMessage {
-                                id_stream: stream_id as u32,
-                                message: data.clone(),
-                            };
-                            let _ = sender.send(message);
-                        }
-                        Err(_) => {
-                            if stream.write_all("Invalid format\n".as_bytes()).is_err() {
-                                break;
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Server: Errore nella lettura dal flusso: {}", e);
-                }
-            }
-            if *THREAD_EXIT.get_or_init(|| Arc::new(Mutex::new(false))).lock().unwrap() == true {
+            let exit = THREAD_EXIT.get().unwrap().lock().unwrap();
+            if *exit {
                 break;
+            }
+            match handler.lock().unwrap().handle_stream() {
+                Ok(_) => {}
+                Err(e) => {
+                    let log_entry = LogEntry::new(
+                        LogLevel::Error, 
+                        name.to_string(),
+                         e.clone());
+                    logger_input.send(log_entry).unwrap();
+                    break;
+                }
             }
         }
     }
+    pub fn send_answer(&self, message: TcpMessage<T>) -> Result<(), StreamErrCode> {
+
+        if let Some(handler) = self.tcp_stream.get(&message.id_stream) {
+            let sender = handler.lock().unwrap().get_sender();
+            sender.send(message).map_err(|_| StreamErrCode::SendDataError)
+        } else {
+            Err(StreamErrCode::InvalidInput)
+        }
+    }
+        
 }
 
 impl<T> StreamProcessor for TcpReceiver<T> 
@@ -153,6 +217,10 @@ where T: 'static + Send + Clone
             self.set_state(StreamingState::Stopped);
             return Err(StreamErrCode::SendDataError);
         }
+        self.process()?;
+        Ok(())
+    }
+    fn process(&mut self) -> Result<(), StreamErrCode > {
         let mut counter_stream: u32 = 0;
         for stream in self.tcp_listen.as_ref().unwrap().incoming() {
             if stream.is_ok() {
@@ -161,33 +229,21 @@ where T: 'static + Send + Clone
                 let _lock = self.lock.lock().unwrap();
                 let output = self.get_output::<TcpMessage<T>>("received").expect("").clone();
                 let mut tm = TaskManager::get().lock().unwrap();
+                let tcp_handler = TcpHandler::new(counter_stream, stream.as_ref().unwrap().try_clone().unwrap(), output.clone());
+                let tcp_handler_arc = Arc::new(Mutex::new(tcp_handler));
+                self.tcp_stream.insert(counter_stream, tcp_handler_arc.clone());
                 let name = self.name;
-                let stream = stream.unwrap();
-                let stream_thread = stream.try_clone().unwrap();
-                let handle = tm.create_task(name, move|| {
-                    Self::handle_client(stream_thread, counter_stream, output);
+                let logger_input = self.logger.get_input("LogEntry").unwrap().sender.clone();
+                let handle = tm.create_task(name, move || {
+                    Self::receiver_loop(tcp_handler_arc, logger_input, name);
                 });
-                let stream_vect = stream.try_clone().unwrap();
                 match handle {
                     Ok(handle) => {
                         self.tcp_handle.push(handle);
-                        self.tcp_stream.insert(counter_stream, stream_vect);
                     }
                     Err(e) => {}
                 }
             }
-        }
-        Ok(())
-    }
-    fn process(&mut self) -> Result<(), StreamErrCode > {
-        let input: Result<TcpMessage<T>, StreamErrCode> = self.recv_input::<TcpMessage<T>>("response");
-        match input {
-            Ok (message) => {
-                if let Some(mut stream) = self.tcp_stream.get(&message.id_stream) {
-                    let _ = stream.write_all(as_byte::<T>(&message.message));
-                }
-            },
-            Err(e) => {return Err(e);},
         }
         Ok(())
     }
